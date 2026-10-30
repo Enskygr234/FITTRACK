@@ -9,7 +9,7 @@
 - **Dinlenme sayacı**: set tamamlanınca otomatik başlar, ±15 sn, sesli ve titreşimli uyarı
 - **Antrenman geçmişi**: süre, set, hacim ve tahmini kalori ile
 - **Düzenlenebilir şablonlar**: egzersiz ekle/çıkar/sırala, set ve tekrar değiştir
-- **Egzersiz kütüphanesi**: 29 egzersiz, kas haritası, adım adım teknik, ipuçları, gelişim grafiği ve kişisel rekor
+- **Egzersiz kütüphanesi**: 28 egzersiz (gerçek fotoğraflı), kas haritası, adım adım teknik, ipuçları, gelişim grafiği ve kişisel rekor
 - **Beslenme**: öğün bazlı kayıt, hazır besin listesi, porsiyon çarpanı, makro hedefleri
 - **Protein takibi**: gram olarak kayıt, hızlı ekleme, kiloya göre hedef önerisi (1,6–2,2 g/kg)
 - **Kalori takibi**: alınan/yakılan/net, Mifflin-St Jeor ile günlük ihtiyaç hesaplayıcı
@@ -33,6 +33,7 @@ fittrack/
 │   ├── charts.js           # Bağımlılıksız SVG/HTML grafikler
 │   └── script.js           # Yönlendirme, 12 sayfa, olaylar, dinlenme sayacı
 ├── assets/                 # Uygulama ikonları
+│   └── img/ex/             # Egzersiz fotoğrafları (56 adet)
 ├── manifest.webmanifest    # PWA bildirimi
 ├── sw.js                   # Çevrimdışı önbellek (http/https üzerinde)
 └── android/                # APK sarmalayıcısı (WebView)
@@ -72,6 +73,10 @@ KEYSTORE=benim.jks KS_ALIAS=fittrack KS_PASS=sifre ./build-apk.sh
 ```
 
 Depo GitHub'a yüklendiğinde `.github/workflows/android.yml` her push'ta APK'yı otomatik derleyip "Artifacts" olarak ekler.
+
+## Görseller
+
+Egzersiz fotoğrafları [Free Exercise DB](https://github.com/yuhonas/free-exercise-db) projesinden alınmıştır (kamu malı, Unlicense). Her egzersiz için başlangıç ve bitiş pozisyonu fotoğrafı bulunur; detay sayfasında hareketi canlandırmak için dönüşümlü gösterilir.
 
 ## Notlar
 

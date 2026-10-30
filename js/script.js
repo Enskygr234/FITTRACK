@@ -43,7 +43,8 @@ const level = () => {
   const n = S().sessions.length;
   return { lvl: 1 + Math.floor(n / 8), progress: (n % 8) / 8, left: 8 - (n % 8) };
 };
-const thumb = (ex, cls = '') => `<div class="thumb ${cls} t-${ex.region}">${icon(GROUP_ICON[ex.group] || 'dumbbell')}</div>`;
+const thumb = (ex, cls = '') => `<div class="thumb photo ${cls} t-${ex.region}"><img src="${ex.img[0]}" alt="" loading="lazy" decoding="async"></div>`;
+const photoBg = (src, cls = '') => `<div class="photo-bg ${cls}" style="background-image:url('${src}')" aria-hidden="true"></div>`;
 const emptyState = (ic, title, text, btn = '') => `<div class="empty">${icon(ic)}<b>${title}</b><p>${text}</p>${btn}</div>`;
 
 /* ---------------- Navigasyon ---------------- */
@@ -234,25 +235,6 @@ function statCard({ ic, label, value, sub = '', bar = '', to = '', tone = 'red' 
 function pageHead(title, sub = '', actions = '') {
   return `<div class="page-head"><div><h1>${title}</h1>${sub ? `<p class="muted">${sub}</p>` : ''}</div>${actions ? `<div class="head-actions">${actions}</div>` : ''}</div>`;
 }
-function heroArt() {
-  return `<svg viewBox="0 0 400 220" class="hero-svg" aria-hidden="true">
-    <defs>
-      <radialGradient id="hg1" cx="70%" cy="45%" r="60%"><stop offset="0" stop-color="#ff2d3d" stop-opacity=".55"/><stop offset="1" stop-color="#ff2d3d" stop-opacity="0"/></radialGradient>
-      <linearGradient id="hg2" x1="0" x2="1"><stop offset="0" stop-color="#3a4256"/><stop offset=".5" stop-color="#9aa3b8"/><stop offset="1" stop-color="#2a3142"/></linearGradient>
-      <linearGradient id="hg3" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2b3245"/><stop offset="1" stop-color="#0e121b"/></linearGradient>
-    </defs>
-    <rect width="400" height="220" fill="url(#hg1)"/>
-    <g opacity=".18" stroke="#ff2d3d" stroke-width="2">${Array.from({ length: 9 }, (_, i) => `<line x1="${120 + i * 34}" y1="230" x2="${220 + i * 34}" y2="-10"/>`).join('')}</g>
-    <g transform="translate(205 110) rotate(-18)">
-      <rect x="-110" y="-6" width="220" height="12" rx="6" fill="url(#hg2)"/>
-      <rect x="-104" y="-46" width="26" height="92" rx="6" fill="url(#hg3)" stroke="#ff2d3d" stroke-opacity=".6"/>
-      <rect x="-78" y="-36" width="18" height="72" rx="5" fill="url(#hg3)" stroke="#ff2d3d" stroke-opacity=".35"/>
-      <rect x="78" y="-46" width="26" height="92" rx="6" fill="url(#hg3)" stroke="#ff2d3d" stroke-opacity=".6"/>
-      <rect x="60" y="-36" width="18" height="72" rx="5" fill="url(#hg3)" stroke="#ff2d3d" stroke-opacity=".35"/>
-      <rect x="-112" y="-8" width="8" height="16" rx="3" fill="#596178"/><rect x="104" y="-8" width="8" height="16" rx="3" fill="#596178"/>
-    </g>
-  </svg>`;
-}
 function macroLegend(t) {
   const total = t.carbs * 4 + t.protein * 4 + t.fat * 9;
   const row = (c, name, g, kcal) => `<li><i style="background:${c}"></i><span>${name}</span><b>${fmt(Math.round(g))} g</b><em>${total ? Math.round((kcal / total) * 100) : 0}%</em></li>`;
@@ -301,7 +283,7 @@ function pageHome() {
     todayCard = `<div class="tw-state">${icon('trophy', 'ic-xl')}<h3>Bugünkü antrenman tamamlandı</h3><p class="muted">Harika iş! Toparlanmaya ve beslenmene odaklan.</p></div>
       <button class="btn btn-ghost btn-block" data-action="go" data-to="stats">İlerlemeni Gör</button>`;
   } else if (todayTpl) {
-    todayCard = `<div class="tw-head"><div><h3>${esc(todayTpl.name)}</h3><p class="muted">${esc(todayTpl.focus)}</p></div>${typeBadge(todayTpl.type)}</div>
+    todayCard = `<div class="tw-banner">${photoBg(tplPhoto(todayTpl))}<div class="tw-banner-text"><h3>${esc(todayTpl.name)}</h3><p>${esc(todayTpl.focus)}</p></div>${typeBadge(todayTpl.type)}</div>
       <ul class="tw-list">${todayTpl.items.slice(0, 4).map(it => `<li><span>${esc(EX_BY_ID[it.ex].name)}</span><em>${it.sets} × ${esc(it.reps)}</em></li>`).join('')}
       ${todayTpl.items.length > 4 ? `<li class="muted">+${todayTpl.items.length - 4} egzersiz daha</li>` : ''}</ul>
       <button class="btn btn-primary btn-block" data-action="start-workout" data-tpl="${today.tpl}">${icon('play')} Antrenmanı Başlat</button>`;
@@ -320,7 +302,7 @@ function pageHome() {
 
   <div class="grid home-top">
     <div class="card hero">
-      ${heroArt()}
+      ${photoBg('assets/img/ex/bench-press-1.jpg', 'hero-photo')}
       <div class="hero-text">
         <h2>Disiplin<br>başarıyı <span>getirir.</span></h2>
         <span class="accent-line"></span>
@@ -363,16 +345,16 @@ function pageHome() {
     <div class="card">
       <div class="card-head"><span class="card-title">Son Antrenman</span><a href="#/workout" class="card-link">Geçmiş ${icon('right')}</a></div>
       ${last ? `<div class="last-w">
-          <div class="thumb t-${last.type === 'lower' ? 'lower' : 'upper'}">${icon('dumbbell')}</div>
+          ${last.exercises[0] && EX_BY_ID[last.exercises[0].ex] ? thumb(EX_BY_ID[last.exercises[0].ex]) : `<div class="thumb">${icon('dumbbell')}</div>`}
           <div class="li-body"><b>${esc(last.title)}</b><span class="muted">${dayLabel(last.date)} · ${fmtDur(last.durationSec)}</span></div>
           <span class="badge badge-green">Tamamlandı</span></div>
           <div class="kv-row"><div><small>Set</small><b>${last.setCount}</b></div><div><small>Hacim</small><b>${fmt(last.volume)} kg</b></div><div><small>Kalori</small><b>${fmt(last.burned)} kcal</b></div></div>`
         : emptyState('history', 'Henüz antrenman yok', 'İlk antrenmanını tamamladığında burada göreceksin.')}
     </div>
     <div class="card promo">
-      <div><h3>Hayalindeki vücuda<br>bir adım daha yakınsın!</h3><p class="muted">Programını takip et, ağırlıklarını kaydet, gelişimini gör.</p>
+      ${photoBg('assets/img/ex/pull-up-1.jpg', 'promo-photo')}
+      <div class="promo-text"><h3>Hayalindeki vücuda<br>bir adım daha yakınsın!</h3><p class="muted">Programını takip et, ağırlıklarını kaydet, gelişimini gör.</p>
       <button class="btn btn-primary btn-sm" data-action="go" data-to="programs">Programı İncele ${icon('right')}</button></div>
-      <div class="promo-art">${icon('trophy')}</div>
     </div>
   </div>`;
 }
@@ -388,7 +370,7 @@ function pageWorkout() {
   const shown = ui.histAll ? hist : hist.slice(0, 8);
 
   const planCard = tpl ? `
-      <div class="tw-head"><div><span class="eyebrow">Bugün · ${DAY_NAMES[today.dayIdx]}</span><h2>${esc(tpl.name)}</h2><p class="muted">${esc(tpl.focus)}</p></div>${typeBadge(tpl.type)}</div>
+      <div class="tw-banner lg">${photoBg(tplPhoto(tpl))}<div class="tw-banner-text"><span class="eyebrow">Bugün · ${DAY_NAMES[today.dayIdx]}</span><h2>${esc(tpl.name)}</h2><p>${esc(tpl.focus)} · ${tpl.items.length} egzersiz</p></div>${typeBadge(tpl.type)}</div>
       ${today.done ? '<div class="note ok">' + icon('check') + '<span>Bugünkü antrenmanı tamamladın. İstersen ek bir antrenman başlatabilirsin.</span></div>' : ''}
       <div class="ex-list">${tpl.items.map((it, i) => {
         const ex = EX_BY_ID[it.ex];
@@ -407,7 +389,7 @@ function pageWorkout() {
       <div class="card">
         <div class="card-head"><span class="card-title">Hızlı Başlat</span></div>
         <div class="quick-tpls">
-          ${TEMPLATE_ORDER.map(k => `<button class="qt t-${s.templates[k].type}" data-action="start-workout" data-tpl="${k}">
+          ${TEMPLATE_ORDER.map(k => `<button class="qt t-${s.templates[k].type}" data-action="start-workout" data-tpl="${k}">${photoBg(tplPhoto(s.templates[k]), 'qt-photo')}
             <span class="qt-ic">${icon(s.templates[k].type === 'upper' ? 'g_chest' : 'g_leg')}</span>
             <b>${esc(s.templates[k].name)}</b><small>${s.templates[k].items.length} egzersiz</small></button>`).join('')}
           <button class="qt qt-free" data-action="start-workout" data-tpl=""><span class="qt-ic">${icon('plus')}</span><b>Serbest Antrenman</b><small>Kendin oluştur</small></button>
@@ -582,11 +564,19 @@ function pageExercise(id) {
   return `
   <button class="back-link" data-action="back">${icon('left')} Geri</button>
   <div class="card ex-hero t-${ex.region}">
-    <div class="ex-hero-art">${icon(GROUP_ICON[ex.group])}</div>
+    <div class="ex-media" data-action="ex-frame" title="Pozisyonu değiştirmek için dokun">
+      <img class="f0" src="${ex.img[0]}" alt="${esc(ex.name)} başlangıç pozisyonu">
+      <img class="f1" src="${ex.img[1]}" alt="${esc(ex.name)} bitiş pozisyonu">
+      <div class="ex-media-shade"></div>
+      <div class="ex-frames"><span class="fr fr0">Başlangıç</span><span class="fr fr1">Bitiş</span></div>
+      <div class="ex-hero-title">
+        <div class="badges"><span class="badge badge-red">${ex.group}</span><span class="badge">${ex.region === 'upper' ? 'Üst Vücut' : 'Alt Vücut'}</span></div>
+        <h1>${esc(ex.name)}</h1>
+      </div>
+    </div>
     <div class="ex-hero-text">
-      <div class="badges"><span class="badge badge-red">${ex.group}</span><span class="badge">${ex.region === 'upper' ? 'Üst Vücut' : 'Alt Vücut'}</span><span class="badge">${ex.equipment}</span></div>
-      <h1>${esc(ex.name)}</h1>
       <p>${esc(ex.desc)}</p>
+      <span class="badge">${icon('dumbbell')} ${ex.equipment}</span>
     </div>
   </div>
   <div class="grid g-4">
@@ -1119,6 +1109,11 @@ function pageSettings() {
         ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v1.0.0')}
         ${link('privacy', 'shield', 'Gizlilik', 'Verilerin yalnızca bu cihazda saklanır')}
       </div>
+      <div class="card brand-card">
+        ${photoBg('assets/img/ex/hammer-curl-1.jpg', 'brand-photo')}
+        <div class="brand-card-text"><h3>Disiplin,<br>özgürlüğü <span>getirir.</span></h3>
+        <span class="brand-text">${icon('dumbbell')} FIT<span>TRACK</span></span></div>
+      </div>
     </div>
   </div>`;
 }
@@ -1143,6 +1138,7 @@ function openExercisePicker(target) {
 
 function openOnboarding() {
   openModal('FITTRACK\'e Hoş Geldin', `
+    <div class="onb-banner">${photoBg('assets/img/ex/squat-0.jpg')}<div><b>Daha güçlü bir sen</b><span>Programını, beslenmeni ve gelişimini tek yerden takip et.</span></div></div>
     <p class="muted">Sana uygun hedefleri hesaplayabilmemiz için birkaç bilgi gir. Tüm veriler yalnızca bu cihazda saklanır.</p>
     <form data-form="onboard" class="form">
       <div class="field"><label>Adın</label><input name="name" maxlength="40" placeholder="Adın" autocomplete="given-name"></div>
@@ -1199,6 +1195,7 @@ function startWorkout(tpl) {
 
 const ACTIONS = {
   'go': (el) => go(el.dataset.to),
+  'ex-frame': (el) => { el.classList.toggle('manual'); el.classList.toggle('show1'); },
   'back': () => { if (history.length > 1) history.back(); else go('library'); },
   'open-drawer': openDrawer,
   'close-drawer': closeDrawer,
@@ -1380,7 +1377,7 @@ const ACTIONS = {
     <div class="about"><div class="brand big">${icon('dumbbell')}<span class="brand-text">FIT<span>TRACK</span></span></div>
     <p class="muted">Sürüm 1.0.0 · Daha güçlü bir sen.</p>
     <p>FITTRACK; üst/alt vücut bölünmüş antrenman programı, set–tekrar–ağırlık takibi, dinlenme sayacı, beslenme, protein, kalori ve su takibini tek bir yerde toplayan, tamamen çevrimdışı çalışan bir fitness uygulamasıdır.</p>
-    <p class="hint">HTML5, CSS3 ve saf JavaScript ile geliştirilmiştir. Kalori ve vücut yağı hesaplamaları tahminidir; tıbbi tavsiye yerine geçmez.</p></div>`),
+    <p class="hint">Egzersiz fotoğrafları: Free Exercise DB (kamu malı, Unlicense). HTML5, CSS3 ve saf JavaScript ile geliştirilmiştir. Kalori ve vücut yağı hesaplamaları tahminidir; tıbbi tavsiye yerine geçmez.</p></div>`),
   'privacy': () => openModal('Gizlilik', `
     <p>FITTRACK hiçbir sunucuya veri göndermez. Girdiğin tüm bilgiler yalnızca bu cihazdaki tarayıcı depolamasında (LocalStorage) tutulur.</p>
     <ul class="tips">${['Hesap veya giriş gerekmez.', 'Reklam ve takip aracı yoktur.', 'Verilerini istediğin zaman yedekleyebilir veya tamamen silebilirsin.'].map(x => `<li>${icon('check')}<span>${x}</span></li>`).join('')}</ul>`),

@@ -200,7 +200,10 @@ const EXERCISES = [
     tips: ['Hareketi kalçadan değil omurgayı bükerek yap.'] }
 ];
 
+/* Fotoğraflar: Free Exercise DB (kamu malı / Unlicense) — 0: başlangıç, 1: bitiş pozisyonu */
+EXERCISES.forEach(e => { e.img = [`assets/img/ex/${e.id}-0.jpg`, `assets/img/ex/${e.id}-1.jpg`]; });
 const EX_BY_ID = Object.fromEntries(EXERCISES.map(e => [e.id, e]));
+const tplPhoto = (tpl) => { const it = tpl && tpl.items[0]; return it && EX_BY_ID[it.ex] ? EX_BY_ID[it.ex].img[1] : 'assets/img/ex/bench-press-1.jpg'; };
 
 /* ---------- Program şablonları (Üst / Alt bölünmüş) ---------- */
 const DEFAULT_TEMPLATES = {
