@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#07090f" />
+  <meta name="description" content="FITTRACK — antrenman, beslenme, protein, kalori ve su takibi için fitness uygulaması." />
+  <title>FITTRACK — Daha Güçlü Bir Sen</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- Kenar çubuğu (masaüstü / tablet) -->
+    <aside class="sidebar" id="sidebar" aria-label="Ana menü">
+      <a href="#/home" class="brand" aria-label="FITTRACK ana sayfa">
+        <span class="brand-mark" data-icon="dumbbell"></span>
+        <span class="brand-text">FIT<span>TRACK</span></span>
+      </a>
+      <nav class="nav" id="nav"></nav>
+      <div class="sidebar-foot" id="sidebarFoot"></div>
+    </aside>
+
+    <div class="drawer-backdrop" id="drawerBackdrop" data-action="close-drawer"></div>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="btn-icon only-mobile" data-action="open-drawer" aria-label="Menüyü aç"><span data-icon="menu"></span></button>
+        <div class="topbar-title" id="topbarTitle"></div>
+        <div class="topbar-actions">
+          <span class="topbar-date" id="topbarDate"></span>
+          <button class="btn-icon" data-action="go" data-to="water" aria-label="Su ekle"><span data-icon="drop"></span></button>
+          <a href="#/profile" class="avatar" id="topbarAvatar" aria-label="Profil"></a>
+        </div>
+      </header>
+
+      <main class="view" id="view" tabindex="-1"></main>
+    </div>
+
+    <!-- Alt menü (telefon) -->
+    <nav class="bottom-nav" id="bottomNav" aria-label="Alt menü"></nav>
+  </div>
+
+  <!-- Dinlenme sayacı -->
+  <div class="rest-timer" id="restTimer" hidden>
+    <div class="rt-ring" id="rtRing"></div>
+    <div class="rt-info">
+      <div class="rt-label">Dinlenme</div>
+      <div class="rt-time" id="rtTime">01:30</div>
+    </div>
+    <div class="rt-actions">
+      <button class="btn btn-ghost btn-sm" data-action="rest-add" data-sec="-15">−15</button>
+      <button class="btn btn-ghost btn-sm" data-action="rest-add" data-sec="15">+15</button>
+      <button class="btn btn-primary btn-sm" data-action="rest-stop">Atla</button>
+    </div>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/script.js"></script>
+</body>
+</html>

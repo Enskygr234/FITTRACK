@@ -1,0 +1,13 @@
+# Android derleme çıktıları
+android/build/
+android/dist/
+android/tools/
+*.jks
+*.keystore
+
+# Sistem / editör
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+node_modules/
