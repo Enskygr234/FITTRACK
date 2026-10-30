@@ -1106,7 +1106,7 @@ function pageSettings() {
       </div>
       <div class="card">
         <div class="card-head"><span class="card-title">${icon('info')} Hakkında</span></div>
-        ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v1.0.0')}
+        ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v1.1.0')}
         ${link('privacy', 'shield', 'Gizlilik', 'Verilerin yalnızca bu cihazda saklanır')}
       </div>
       <div class="card brand-card">
@@ -1375,7 +1375,7 @@ const ACTIONS = {
   }),
   'about': () => openModal('FITTRACK Hakkında', `
     <div class="about"><div class="brand big">${icon('dumbbell')}<span class="brand-text">FIT<span>TRACK</span></span></div>
-    <p class="muted">Sürüm 1.0.0 · Daha güçlü bir sen.</p>
+    <p class="muted">Sürüm 1.1.0 · Daha güçlü bir sen.</p>
     <p>FITTRACK; üst/alt vücut bölünmüş antrenman programı, set–tekrar–ağırlık takibi, dinlenme sayacı, beslenme, protein, kalori ve su takibini tek bir yerde toplayan, tamamen çevrimdışı çalışan bir fitness uygulamasıdır.</p>
     <p class="hint">Egzersiz fotoğrafları: Free Exercise DB (kamu malı, Unlicense). HTML5, CSS3 ve saf JavaScript ile geliştirilmiştir. Kalori ve vücut yağı hesaplamaları tahminidir; tıbbi tavsiye yerine geçmez.</p></div>`),
   'privacy': () => openModal('Gizlilik', `
