@@ -38,6 +38,12 @@
     const/4 v3, 0x0
     invoke-virtual {v2, v3}, Landroid/webkit/WebSettings;->setMediaPlaybackRequiresUserGesture(Z)V
 
+    # widget köprüsü
+    new-instance v2, Lcom/fittrack/app/Bridge;
+    invoke-direct {v2, p0}, Lcom/fittrack/app/Bridge;-><init>(Landroid/content/Context;)V
+    const-string v3, "FitBridge"
+    invoke-virtual {v0, v2, v3}, Landroid/webkit/WebView;->addJavascriptInterface(Ljava/lang/Object;Ljava/lang/String;)V
+
     new-instance v2, Landroid/webkit/WebViewClient;
     invoke-direct {v2}, Landroid/webkit/WebViewClient;-><init>()V
     invoke-virtual {v0, v2}, Landroid/webkit/WebView;->setWebViewClient(Landroid/webkit/WebViewClient;)V
@@ -93,11 +99,15 @@
 .end method
 
 .method protected onResume()V
-    .locals 1
+    .locals 3
     invoke-super {p0}, Landroid/app/Activity;->onResume()V
     iget-object v0, p0, Lcom/fittrack/app/MainActivity;->web:Landroid/webkit/WebView;
     if-eqz v0, :skip
     invoke-virtual {v0}, Landroid/webkit/WebView;->onResume()V
+    # widget'tan eklenen suyu uygulamaya aktar
+    const-string v1, "window.fitOnResume&&window.fitOnResume()"
+    const/4 v2, 0x0
+    invoke-virtual {v0, v1, v2}, Landroid/webkit/WebView;->evaluateJavascript(Ljava/lang/String;Landroid/webkit/ValueCallback;)V
     :skip
     return-void
 .end method

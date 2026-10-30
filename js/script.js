@@ -1176,6 +1176,7 @@ function pageSettings() {
         <div class="set-item"><span class="si-ic">${icon('moon')}</span><div class="si-body"><b>Tema</b><small>Koyu lacivert veya tam siyah</small></div>
           <div class="seg sm"><button class="seg-btn${st.theme !== 'amoled' ? ' active' : ''}" data-action="theme" data-v="dark">Koyu</button><button class="seg-btn${st.theme === 'amoled' ? ' active' : ''}" data-action="theme" data-v="amoled">Siyah</button></div></div>
         ${toggle('reminders', 'bell', 'Su hatırlatıcı', 'Uygulama açıkken her 2 saatte bir')}
+        ${link('widget-help', 'grid', 'Ana ekran widget\'ı', 'Su, protein ve kalori özetini ana ekranda gör')}
       </div>
       <div class="card">
         <div class="card-head"><span class="card-title">${icon('database')} Veri</span></div>
@@ -1187,7 +1188,7 @@ function pageSettings() {
       </div>
       <div class="card">
         <div class="card-head"><span class="card-title">${icon('info')} Hakkında</span></div>
-        ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v1.2.0')}
+        ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v1.3.0')}
         ${link('privacy', 'shield', 'Gizlilik', 'Verilerin yalnızca bu cihazda saklanır')}
       </div>
       <div class="card brand-card">
@@ -1465,6 +1466,12 @@ const ACTIONS = {
   'theme': (el) => { S().settings.theme = el.dataset.v; Store.save(); applyTheme(); rerender(); },
   'export': exportData,
   'go-programs': () => go('programs'),
+  'widget-help': () => openModal('Ana Ekran Widget\'ı', `
+    <div class="widget-demo"><div class="wd-top"><b>FIT<span>TRACK</span></b><small>Bugün: Üst Vücut A</small></div>
+      <div class="wd-cells"><div><small>Su</small><b>1250 ml</b><i style="--p:42%;--c:var(--sky)"></i></div><div><small>Protein</small><b>88 g</b><i style="--p:59%;--c:#a78bfa"></i></div><div><small>Kalori</small><b>1.082 kcal</b><i style="--p:43%;--c:var(--red)"></i></div></div>
+      <div class="wd-btn">+ 250 ml su ekle</div></div>
+    <ol class="steps"><li><span>Telefonunda ana ekranda boş bir yere uzun bas.</span></li><li><span><b>Widget'lar</b>'a dokun ve listede <b>FITTRACK</b>'i bul.</span></li><li><span>Widget'ı ana ekrana sürükle. Uygulamada yaptığın her kayıt widget'a otomatik yansır.</span></li><li><span><b>+250 ml su ekle</b> butonuyla uygulamayı açmadan su ekleyebilirsin; uygulamayı açtığında kayda işlenir.</span></li></ol>
+    ${IN_APP ? '' : '<p class="hint">Widget yalnızca Android uygulamasında (APK) kullanılabilir.</p>'}`),
   'copy-backup': () => {
     const ta = $('#backupText');
     const done = () => toast('Yedek panoya kopyalandı');
@@ -1489,7 +1496,7 @@ const ACTIONS = {
   }),
   'about': () => openModal('FITTRACK Hakkında', `
     <div class="about"><div class="brand big">${icon('dumbbell')}<span class="brand-text">FIT<span>TRACK</span></span></div>
-    <p class="muted">Sürüm 1.2.0 · Daha güçlü bir sen.</p>
+    <p class="muted">Sürüm 1.3.0 · Daha güçlü bir sen.</p>
     <p>FITTRACK; üst/alt vücut bölünmüş antrenman programı, set–tekrar–ağırlık takibi, dinlenme sayacı, beslenme, protein, kalori ve su takibini tek bir yerde toplayan, tamamen çevrimdışı çalışan bir fitness uygulamasıdır.</p>
     <p class="hint">Egzersiz fotoğrafları: Free Exercise DB (kamu malı, Unlicense). HTML5, CSS3 ve saf JavaScript ile geliştirilmiştir. Kalori ve vücut yağı hesaplamaları tahminidir; tıbbi tavsiye yerine geçmez.</p></div>`),
   'privacy': () => openModal('Gizlilik', `
@@ -1675,6 +1682,38 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+/* ---------------- Android ana ekran widget'ı ---------------- */
+/* Uygulama APK içinde çalışırken (FitBridge) günlük özet widget'a gönderilir. */
+function syncWidget() {
+  if (!window.FitBridge || !S()) return;
+  try {
+    const s = S(), t = DateUtil.today();
+    const tot = Store.totals(t), water = Store.waterTotal(t);
+    const plan = Store.todayPlan();
+    const tpl = plan && plan.tpl ? s.templates[plan.tpl] : null;
+    const line = s.active ? `▶ ${s.active.title}` : plan && plan.done ? '✓ Antrenman tamamlandı'
+      : tpl ? `Bugün: ${tpl.name}` : 'Bugün dinlenme günü';
+    window.FitBridge.update(t, line, Math.round(water), Math.round(s.settings.waterGoal),
+      `${Math.round(tot.protein)} g`, clamp(pct(tot.protein, s.settings.proteinGoal), 0, 100),
+      `${fmt(tot.kcal)} kcal`, clamp(pct(tot.kcal, s.settings.kcalGoal), 0, 100));
+  } catch (e) { /* widget isteğe bağlıdır */ }
+}
+let widgetTimer = null;
+function onStoreSaved() { clearTimeout(widgetTimer); widgetTimer = setTimeout(syncWidget, 400); }
+/* Widget'taki "+250 ml" ile eklenen suyu uygulamaya aktar (Android onResume'da çağırır) */
+window.fitOnResume = function () {
+  if (!window.FitBridge) return;
+  let ml = 0;
+  try { ml = +window.FitBridge.takePendingWater() || 0; } catch (e) { ml = 0; }
+  if (ml > 0) {
+    const t = DateUtil.today();
+    for (let i = 0; i < Math.floor(ml / 250); i++) Store.addWater(t, 250);
+    if (ml % 250) Store.addWater(t, ml % 250);
+    rerender();
+    toast(`Widget'tan ${ml} ml su eklendi 💧`, 'info');
+  } else syncWidget();
+};
+
 /* ---------------- Tema / hatırlatıcı ---------------- */
 function applyTheme() {
   document.documentElement.dataset.theme = S().settings.theme === 'amoled' ? 'amoled' : 'dark';
@@ -1699,6 +1738,7 @@ function init() {
   window.addEventListener('hashchange', () => { closeDrawer(); render(); });
   render();
   if (!S().onboarded) openOnboarding();
+  window.fitOnResume();
   setInterval(tickSession, 1000);
   setInterval(reminderTick, 60 * 1000);
   // Gün değişimini yakala (uygulama gece açık kalırsa)

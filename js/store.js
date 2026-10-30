@@ -84,6 +84,7 @@ const Store = {
   save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state)); }
     catch (e) { console.error('Kaydetme hatası', e); }
+    if (typeof onStoreSaved === 'function') onStoreSaved();
   },
 
   reset() { this.state = defaultState(); this.save(); },

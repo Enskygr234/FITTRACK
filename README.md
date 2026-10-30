@@ -17,6 +17,7 @@
 - **Su takibi**: bardak butonları, özel miktar, günlük hedef, hatırlatıcı
 - **İstatistikler**: haftalık/aylık/yıllık kilo, hacim, kalori, protein ve su grafikleri, VKİ, tahmini yağ oranı, kişisel rekorlar
 - **Profil ve ayarlar**: hedefler, tema (koyu/AMOLED siyah), ses/titreşim, JSON yedekleme/geri yükleme, sıfırlama
+- **Android ana ekran widget'ı**: bugünkü antrenman, su, protein ve kalori özeti; uygulamayı açmadan +250 ml su ekleme
 - **LocalStorage**: tüm veriler cihazda saklanır; sunucu, hesap veya takip yok
 - **Duyarlı tasarım**: telefon (alt menü + çekmece), tablet (ikon menü), masaüstü (tam kenar çubuğu)
 
@@ -41,7 +42,9 @@ fittrack/
 ├── sw.js                   # Çevrimdışı önbellek (http/https üzerinde)
 └── android/                # APK sarmalayıcısı (WebView)
     ├── AndroidManifest.xml
-    ├── smali/…/MainActivity.smali
+    ├── smali/…/MainActivity.smali   # WebView
+    ├── smali/…/FitWidget.smali      # Ana ekran widget'ı
+    ├── smali/…/Bridge.smali         # JS ↔ widget köprüsü
     ├── res/
     └── build-apk.sh
 ```
@@ -66,7 +69,7 @@ mkdir -p tools
 curl -L -o tools/apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar
 curl -L -o tools/uber-apk-signer.jar https://github.com/patrickfav/uber-apk-signer/releases/download/v1.3.0/uber-apk-signer-1.3.0.jar
 ./build-apk.sh
-# Çıktı: android/dist/FITTRACK-v1.2.0.apk
+# Çıktı: android/dist/FITTRACK-v1.3.0.apk
 ```
 
 Varsayılan olarak hata ayıklama anahtarıyla imzalanır. Kendi anahtarınla imzalamak için:
