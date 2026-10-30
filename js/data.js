@@ -55,6 +55,13 @@ const ICONS = {
   stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
   calc: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h8"/>',
   star: '<path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>',
+  barcode: '<path d="M3 5v14M7 5v14M11 5v14M14 5v14M18 5v14M21 5v14"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/>',
+  ruler: '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+  award: '<circle cx="12" cy="8" r="6"/><path d="M15.5 12.9 17 22l-5-3-5 3 1.5-9.1"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  layers: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
   /* kas grubu ikonları */
   g_chest: '<path d="M7 3h10l2.5 4L17 10v11H7V10L4.5 7z"/><path d="M8 9.5c1.6 1.8 6.4 1.8 8 0M12 10.5v4"/>',
   g_back: '<path d="M12 3 7 6l-3 6 2 9h12l2-9-3-6z"/><path d="M12 3v18M8 12h8"/>',
@@ -210,12 +217,15 @@ EXERCISES.forEach(e => {
   e.thumb = e.img[0];
 });
 (typeof EXTRA_EXERCISES !== 'undefined' ? EXTRA_EXERCISES : []).forEach(x => {
+  const tr = typeof TR_EXERCISES !== 'undefined' && TR_EXERCISES[x.id];
+  if (tr) { x.alias = x.name; x.name = tr.tr; x.steps = tr.steps; x.popular = true; }
   EXERCISES.push(Object.assign(x, {
-    bodyweight: x.bw, tips: [], en: true,
+    bodyweight: x.bw, tips: [], en: !tr,
     thumb: `assets/img/th/${x.id}.jpg`,
     img: [`${IMG_CDN}${x.id}/0.jpg`, `${IMG_CDN}${x.id}/1.jpg`]
   }));
 });
+EXERCISES.sort((a, b) => (a.core ? 0 : a.popular ? 1 : 2) - (b.core ? 0 : b.popular ? 1 : 2));
 const EQUIPMENTS = [...new Set(EXERCISES.map(e => e.equipment.split(/[,(]/)[0].trim()))].sort((a, b) => a.localeCompare(b, 'tr'));
 const EX_BY_ID = Object.fromEntries(EXERCISES.map(e => [e.id, e]));
 const tplPhoto = (tpl) => { const it = tpl && tpl.items[0]; return it && EX_BY_ID[it.ex] ? EX_BY_ID[it.ex].img[1] : 'assets/img/ex/bench-press-1.jpg'; };
@@ -284,7 +294,7 @@ const MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 
 const SCHEDULE_SLOTS = { 3: [0, 2, 4], 4: [0, 1, 3, 4] };
 
 /* ---------- Hazır besinler (porsiyon başına, yaklaşık değerler) ---------- */
-const FOODS = [
+const FOODS_OLD = [
   { name: 'Yumurta (1 adet)', kcal: 72, protein: 6.3, carbs: 0.4, fat: 4.8 },
   { name: 'Tavuk göğsü (100 g, pişmiş)', kcal: 165, protein: 31, carbs: 0, fat: 3.6 },
   { name: 'Dana kıyma (100 g, pişmiş)', kcal: 217, protein: 26, carbs: 0, fat: 12 },
@@ -305,6 +315,7 @@ const FOODS = [
   { name: 'Zeytinyağı (1 yemek kaşığı)', kcal: 119, protein: 0, carbs: 0, fat: 13.5 }
 ];
 
+const FOODS = typeof FOODS_TR !== 'undefined' ? FOODS_TR : FOODS_OLD;
 const MEAL_TYPES = ['Kahvaltı', 'Öğle Yemeği', 'Akşam Yemeği', 'Ara Öğün'];
 
 const GOALS = {

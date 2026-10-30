@@ -39,10 +39,13 @@ function defaultState() {
     profile: { name: '', gender: 'male', age: null, height: null, weight: null, goalWeight: null, activity: 1.55, goals: ['muscle'], createdAt: DateUtil.today() },
     settings: {
       days: 3, program: 'ul3', kcalGoal: 2500, proteinGoal: 150, carbGoal: 300, fatGoal: 80, waterGoal: 3000,
-      restDefault: 90, autoRest: true, sound: true, vibrate: true, theme: 'dark', reminders: false,
+      restDefault: 90, autoRest: true, sound: true, vibrate: true, theme: 'dark', reminders: false, notifyWater: false, notifyWorkout: false, workoutTime: '18:00',
       programStart: DateUtil.weekStart()
     },
     templates: clone(DEFAULT_TEMPLATES),
+    favorites: [],  // favori besinler
+    measurements: [], // vücut ölçüleri
+    badges: {},     // açılan rozetler { id: tarih }
     programs: [],   // özel programlar: {id,name,schedule:[tplKey|null ×7]}
     sessions: [],   // tamamlanan antrenmanlar
     active: null,   // devam eden antrenman
@@ -62,7 +65,9 @@ function migrate(s) {
   if (!out.settings.program || (!BUILTIN_PROGRAMS[out.settings.program] && !(s.programs || []).some(p => p.id === out.settings.program))) {
     out.settings.program = out.settings.days === 4 ? 'ul4' : 'ul3';
   }
-  ['sessions', 'weights', 'programs'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+  if (s.settings && s.settings.reminders && s.settings.notifyWater === undefined) out.settings.notifyWater = true;
+  if (!out.badges || typeof out.badges !== 'object' || Array.isArray(out.badges)) out.badges = {};
+  ['sessions', 'weights', 'programs', 'favorites', 'measurements'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
   ['food', 'water'].forEach(k => { if (!out[k] || typeof out[k] !== 'object') out[k] = {}; });
   return out;
 }
@@ -274,13 +279,25 @@ const Store = {
     if (!a) return null;
     const durationSec = Math.max(60, Math.round((Date.now() - a.startedAt) / 1000));
     const exercises = a.exercises
-      .map(e => ({ ex: e.ex, target: e.target, sets: e.sets.filter(s => s.done).map(s => ({ kg: +s.kg || 0, reps: +s.reps || 0 })) }))
+      .map(e => {
+        const out = { ex: e.ex, target: e.target, sets: e.sets.filter(s => s.done).map(s => {
+          const st = { kg: +s.kg || 0, reps: +s.reps || 0 };
+          if (s.t) st.t = s.t;       // w: ısınma, d: dropset, f: başarısız
+          if (s.rpe) st.rpe = +s.rpe; // zorluk puanı
+          return st;
+        }) };
+        if (e.ss) out.ss = true;
+        if (e.note) out.note = e.note;
+        return out;
+      })
       .filter(e => e.sets.length);
-    const volume = exercises.reduce((v, e) => v + e.sets.reduce((a2, s) => a2 + s.kg * s.reps, 0), 0);
-    const setCount = exercises.reduce((n, e) => n + e.sets.length, 0);
+    const work = (st) => st.t !== 'w';
+    const volume = exercises.reduce((v, e) => v + e.sets.filter(work).reduce((a2, s) => a2 + s.kg * s.reps, 0), 0);
+    const setCount = exercises.reduce((n, e) => n + e.sets.filter(work).length, 0);
     const kg = this.currentWeight() || 75;
     const burned = Math.round(5 * kg * (durationSec / 3600)); // MET≈5 (direnç antrenmanı), tahmini
     const session = { id: a.id, date: a.date, tpl: a.tpl, title: a.title, type: a.type, startedAt: a.startedAt, durationSec, exercises, volume: Math.round(volume), setCount, burned };
+    if (a.note) session.note = a.note;
     this.state.active = null;
     if (setCount > 0) this.state.sessions.push(session);
     this.state.sessions.sort((x, y) => x.startedAt - y.startedAt);
@@ -293,14 +310,16 @@ const Store = {
   lastPerformance(exId) {
     for (let i = this.state.sessions.length - 1; i >= 0; i--) {
       const e = this.state.sessions[i].exercises.find(x => x.ex === exId);
-      if (e && e.sets.length) return { date: this.state.sessions[i].date, sets: e.sets };
+      const sets = e ? e.sets.filter(st => st.t !== 'w') : [];
+      if (sets.length) return { date: this.state.sessions[i].date, sets };
     }
     return null;
   },
   exerciseHistory(exId) {
     return this.state.sessions
       .map(s => {
-        const e = s.exercises.find(x => x.ex === exId);
+        const found = s.exercises.find(x => x.ex === exId);
+        const e = found ? { sets: found.sets.filter(st => st.t !== 'w') } : null;
         if (!e || !e.sets.length) return null;
         const best = e.sets.reduce((b, st) => (st.kg > b.kg || (st.kg === b.kg && st.reps > b.reps)) ? st : b, e.sets[0]);
         const e1rm = Math.max(...e.sets.map(st => st.kg * (1 + st.reps / 30)));

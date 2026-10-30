@@ -123,17 +123,24 @@ const Charts = (() => {
   }
 
   /* Kas haritası */
-  function bodyMap(muscles = []) {
+  /* heat: { kasAnahtarı: 0..1 } verilirse ısı haritası olarak boyanır */
+  function bodyMap(muscles = [], heat = null) {
     const set = new Set(muscles);
     const shape = (s) => {
       const m = s[s.length - 1];
       const on = m && m.some(x => set.has(x));
-      const cls = m ? (on ? 'mm on' : 'mm') : 'mm base';
+      let cls = m ? (on ? 'mm on' : 'mm') : 'mm base';
+      let style = '';
+      if (heat && m) {
+        const v = Math.max(...m.map(x => heat[x] || 0));
+        cls = v > 0 ? 'mm heat' : 'mm';
+        if (v > 0) style = ` style="fill:rgba(255,45,61,${(0.18 + 0.82 * v).toFixed(2)})"`;
+      }
       switch (s[0]) {
-        case 'c': return `<circle class="${cls}" cx="${s[1]}" cy="${s[2]}" r="${s[3]}"/>`;
-        case 'e': return `<ellipse class="${cls}" cx="${s[1]}" cy="${s[2]}" rx="${s[3]}" ry="${s[4]}"/>`;
-        case 'r': return `<rect class="${cls}" x="${s[1]}" y="${s[2]}" width="${s[3]}" height="${s[4]}" rx="${s[5]}"/>`;
-        case 'p': return `<path class="${cls}" d="${s[1]}"/>`;
+        case 'c': return `<circle class="${cls}"${style} cx="${s[1]}" cy="${s[2]}" r="${s[3]}"/>`;
+        case 'e': return `<ellipse class="${cls}"${style} cx="${s[1]}" cy="${s[2]}" rx="${s[3]}" ry="${s[4]}"/>`;
+        case 'r': return `<rect class="${cls}"${style} x="${s[1]}" y="${s[2]}" width="${s[3]}" height="${s[4]}" rx="${s[5]}"/>`;
+        case 'p': return `<path class="${cls}"${style} d="${s[1]}"/>`;
         default: return '';
       }
     };

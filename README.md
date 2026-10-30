@@ -17,6 +17,15 @@
 - **Su takibi**: bardak butonları, özel miktar, günlük hedef, hatırlatıcı
 - **İstatistikler**: haftalık/aylık/yıllık kilo, hacim, kalori, protein ve su grafikleri, VKİ, tahmini yağ oranı, kişisel rekorlar
 - **Profil ve ayarlar**: hedefler, tema (koyu/AMOLED siyah), ses/titreşim, JSON yedekleme/geri yükleme, sıfırlama
+- **Akıllı antrenman**: kademeli yüklenme önerisi (hedef tekrarlara ulaşınca "+2,5 kg dene"), otomatik ısınma setleri, dropset, süperset, set türleri (ısınma/dropset/başarısız), set başına RPE, egzersiz ve antrenman notları
+- **Araçlar**: plaka hesaplayıcı (görsel), ısınma seti hesaplayıcı, 1RM hesaplayıcı ve yüzde tablosu
+- **Vücut Takibi**: bel/göğüs/kol/uyluk/kalça/boyun ölçüleri, grafik, ABD Donanması yöntemiyle yağ oranı; cihazda saklanan ilerleme fotoğrafları ve önce/sonra karşılaştırma kaydırıcısı
+- **Başarılar**: 21 rozet; antrenman, su, protein ve kayıt serileri
+- **Kas ısı haritası**: seçilen aralıkta hangi kası kaç set çalıştırdığın
+- **Beslenme+**: 80+ besin (Türk mutfağı dahil) aramalı seçici, favori öğünler, "dünden kopyala", barkod okutma (Open Food Facts)
+- **Bildirimler**: uygulama kapalıyken de su ve antrenman hatırlatıcıları (Android)
+- **Temalar**: koyu, tam siyah (AMOLED) ve açık tema
+- **Türkçe içerik**: popüler 74 egzersizin Türkçe adı ve uygulama adımları
 - **Android ana ekran widget'ı**: bugünkü antrenman, su, protein ve kalori özeti; uygulamayı açmadan +250 ml su ekleme
 - **LocalStorage**: tüm veriler cihazda saklanır; sunucu, hesap veya takip yok
 - **Duyarlı tasarım**: telefon (alt menü + çekmece), tablet (ikon menü), masaüstü (tam kenar çubuğu)
@@ -31,6 +40,9 @@ fittrack/
 ├── css/style.css           # Tüm stiller (tema, bileşenler, duyarlı kurallar)
 ├── js/
 │   ├── exercises-db.js     # 845 ek egzersiz (tools/build-exercise-db.py ile üretilir)
+│   ├── tr-content.js       # Türkçe egzersiz adımları ve besin listesi
+│   ├── extras.js           # Araçlar, vücut takibi, başarılar, barkod, bildirimler
+│   ├── vendor/             # html5-qrcode (Apache-2.0) — barkod tarayıcı
 │   ├── data.js             # İkonlar, egzersizler, program şablonları, besinler
 │   ├── store.js            # LocalStorage veri katmanı, takvim/rotasyon mantığı
 │   ├── charts.js           # Bağımlılıksız SVG/HTML grafikler
@@ -44,7 +56,9 @@ fittrack/
     ├── AndroidManifest.xml
     ├── smali/…/MainActivity.smali   # WebView
     ├── smali/…/FitWidget.smali      # Ana ekran widget'ı
-    ├── smali/…/Bridge.smali         # JS ↔ widget köprüsü
+    ├── smali/…/Bridge.smali         # JS ↔ widget/bildirim köprüsü
+    ├── smali/…/Reminders.smali      # Hatırlatıcı alarmları ve bildirimler
+    ├── smali/…/FitChrome.smali      # Dosya seçici ve kamera izni
     ├── res/
     └── build-apk.sh
 ```
@@ -69,7 +83,7 @@ mkdir -p tools
 curl -L -o tools/apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar
 curl -L -o tools/uber-apk-signer.jar https://github.com/patrickfav/uber-apk-signer/releases/download/v1.3.0/uber-apk-signer-1.3.0.jar
 ./build-apk.sh
-# Çıktı: android/dist/FITTRACK-v1.3.0.apk
+# Çıktı: android/dist/FITTRACK-v2.0.0.apk
 ```
 
 Varsayılan olarak hata ayıklama anahtarıyla imzalanır. Kendi anahtarınla imzalamak için:
@@ -88,6 +102,11 @@ Egzersiz fotoğrafları [Free Exercise DB](https://github.com/yuhonas/free-exerc
 git clone https://github.com/yuhonas/free-exercise-db
 python3 tools/build-exercise-db.py free-exercise-db --thumbs
 ```
+
+## Üçüncü taraf
+
+- [html5-qrcode](https://github.com/mebjas/html5-qrcode) — Apache-2.0 (barkod tarama)
+- [Open Food Facts](https://world.openfoodfacts.org) — açık ürün veritabanı (barkod sorgusu)
 
 ## Notlar
 

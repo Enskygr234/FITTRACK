@@ -5,6 +5,8 @@
 # FITTRACK — web uygulamasını (assets/www) tam ekran WebView içinde açar.
 
 .field private web:Landroid/webkit/WebView;
+.field public fileCb:Landroid/webkit/ValueCallback;
+.field public pendingPerm:Landroid/webkit/PermissionRequest;
 
 .method public constructor <init>()V
     .locals 0
@@ -47,6 +49,11 @@
     new-instance v2, Landroid/webkit/WebViewClient;
     invoke-direct {v2}, Landroid/webkit/WebViewClient;-><init>()V
     invoke-virtual {v0, v2}, Landroid/webkit/WebView;->setWebViewClient(Landroid/webkit/WebViewClient;)V
+
+    # dosya seçici + kamera izni
+    new-instance v2, Lcom/fittrack/app/FitChrome;
+    invoke-direct {v2, p0}, Lcom/fittrack/app/FitChrome;-><init>(Lcom/fittrack/app/MainActivity;)V
+    invoke-virtual {v0, v2}, Landroid/webkit/WebView;->setWebChromeClient(Landroid/webkit/WebChromeClient;)V
 
     invoke-virtual {p0, v0}, Lcom/fittrack/app/MainActivity;->setContentView(Landroid/view/View;)V
 
@@ -109,5 +116,45 @@
     const/4 v2, 0x0
     invoke-virtual {v0, v1, v2}, Landroid/webkit/WebView;->evaluateJavascript(Ljava/lang/String;Landroid/webkit/ValueCallback;)V
     :skip
+    return-void
+.end method
+
+.method protected onActivityResult(IILandroid/content/Intent;)V
+    .locals 2
+    invoke-super {p0, p1, p2, p3}, Landroid/app/Activity;->onActivityResult(IILandroid/content/Intent;)V
+    const/4 v0, 0x7
+    if-ne p1, v0, :done
+    iget-object v0, p0, Lcom/fittrack/app/MainActivity;->fileCb:Landroid/webkit/ValueCallback;
+    if-eqz v0, :done
+    invoke-static {p2, p3}, Landroid/webkit/WebChromeClient$FileChooserParams;->parseResult(ILandroid/content/Intent;)[Landroid/net/Uri;
+    move-result-object v1
+    invoke-interface {v0, v1}, Landroid/webkit/ValueCallback;->onReceiveValue(Ljava/lang/Object;)V
+    const/4 v0, 0x0
+    iput-object v0, p0, Lcom/fittrack/app/MainActivity;->fileCb:Landroid/webkit/ValueCallback;
+    :done
+    return-void
+.end method
+
+.method public onRequestPermissionsResult(I[Ljava/lang/String;[I)V
+    .locals 3
+    invoke-super {p0, p1, p2, p3}, Landroid/app/Activity;->onRequestPermissionsResult(I[Ljava/lang/String;[I)V
+    const/16 v0, 0x8
+    if-ne p1, v0, :done
+    iget-object v0, p0, Lcom/fittrack/app/MainActivity;->pendingPerm:Landroid/webkit/PermissionRequest;
+    if-eqz v0, :done
+    const/4 v1, 0x0
+    iput-object v1, p0, Lcom/fittrack/app/MainActivity;->pendingPerm:Landroid/webkit/PermissionRequest;
+    array-length v1, p3
+    if-lez v1, :deny
+    const/4 v1, 0x0
+    aget v1, p3, v1
+    if-nez v1, :deny
+    invoke-virtual {v0}, Landroid/webkit/PermissionRequest;->getResources()[Ljava/lang/String;
+    move-result-object v2
+    invoke-virtual {v0, v2}, Landroid/webkit/PermissionRequest;->grant([Ljava/lang/String;)V
+    return-void
+    :deny
+    invoke-virtual {v0}, Landroid/webkit/PermissionRequest;->deny()V
+    :done
     return-void
 .end method

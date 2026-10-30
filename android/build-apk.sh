@@ -14,5 +14,5 @@ cp -r "$ROOT/index.html" "$ROOT/manifest.webmanifest" "$ROOT/css" "$ROOT/js" "$R
 
 java -jar "$TOOLS/apktool.jar" b "$BUILD" -o "$BUILD/fittrack-unsigned.apk"
 java -jar "$TOOLS/uber-apk-signer.jar" -a "$BUILD/fittrack-unsigned.apk" -o "$BUILD/signed" ${KEYSTORE:+--ks "$KEYSTORE" --ksAlias "$KS_ALIAS" --ksPass "$KS_PASS" --ksKeyPass "$KS_PASS"}
-cp "$BUILD"/signed/*.apk "$OUT/FITTRACK-v1.3.0.apk"
-echo "APK hazır: $OUT/FITTRACK-v1.3.0.apk"
+cp "$BUILD"/signed/*.apk "$OUT/FITTRACK-v2.0.0.apk"
+echo "APK hazır: $OUT/FITTRACK-v2.0.0.apk"

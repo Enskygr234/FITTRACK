@@ -51,7 +51,7 @@ function filterExercises({ q = '', group = 'Tümü', equip = '' } = {}) {
   const words = trLower(q).trim().split(/\s+/).filter(Boolean);
   return EXERCISES.filter(e => (group === 'Tümü' || e.group === group) && (!equip || e.equipment.startsWith(equip)) &&
     (!words.length || words.every(w => {
-      const hay = `${trLower(e.name)} ${trLower(e.group)} ${trLower(e.equipment)} ${e.muscles.map(m => trLower(MUSCLE_NAMES[m])).join(' ')}`;
+      const hay = `${trLower(e.name)} ${trLower(e.alias || '')} ${trLower(e.group)} ${trLower(e.equipment)} ${e.muscles.map(m => trLower(MUSCLE_NAMES[m])).join(' ')}`;
       return hay.includes(w);
     })));
 }
@@ -435,8 +435,9 @@ function historyItem(x) {
     ${open ? `<div class="hist-body">
       ${x.exercises.map(e => {
         const ex = EX_BY_ID[e.ex] || { name: e.ex };
-        return `<div class="hb-row"><a href="#/exercise/${e.ex}">${esc(ex.name)}</a><span>${e.sets.map(st => st.kg ? `${fmt(st.kg)}×${st.reps}` : `${st.reps} tekrar`).join(' · ')}</span></div>`;
+        return `<div class="hb-row"><a href="#/exercise/${e.ex}">${esc(ex.name)}${e.ss ? ' <span class="badge badge-violet">SS</span>' : ''}</a><span>${e.sets.map(st => `${st.t === 'w' ? 'I:' : st.t === 'd' ? 'D:' : ''}${st.kg ? `${fmt(st.kg)}×${st.reps}` : `${st.reps} tkr`}${st.rpe ? ` @${st.rpe}` : ''}`).join(' · ')}</span></div>${e.note ? `<div class="hb-note">${esc(e.note)}</div>` : ''}`;
       }).join('')}
+      ${x.note ? `<div class="hb-note">${icon('edit')} ${esc(x.note)}</div>` : ''}
       <div class="hb-foot"><span class="muted sm">${DateUtil.format(x.date)} · ${DateUtil.time(x.startedAt)} · ~${fmt(x.burned)} kcal</span>
       <button class="btn btn-ghost btn-sm danger-text" data-action="session-delete" data-id="${x.id}">${icon('trash')} Sil</button></div>
     </div>` : ''}
@@ -444,9 +445,12 @@ function historyItem(x) {
 }
 
 function activeWorkoutView(a) {
+  const work = (st) => st.t !== 'w';
   const total = a.exercises.reduce((n, e) => n + e.sets.length, 0);
   const done = a.exercises.reduce((n, e) => n + e.sets.filter(st => st.done).length, 0);
-  const vol = a.exercises.reduce((v, e) => v + e.sets.filter(st => st.done).reduce((x, st) => x + (+st.kg || 0) * (+st.reps || 0), 0), 0);
+  const vol = a.exercises.reduce((v, e) => v + e.sets.filter(st => st.done && work(st)).reduce((x, st) => x + (+st.kg || 0) * (+st.reps || 0), 0), 0);
+  const blocks = a.exercises.map((e, i) => exerciseBlock(e, i) + (e.ss && i < a.exercises.length - 1
+    ? `<div class="ss-link"><span>${icon('refresh')} Süperset — iki hareketi dinlenmeden art arda yap</span><button class="btn-icon sm" data-action="ss-toggle" data-ei="${i}" aria-label="Süperseti kaldır">${icon('x')}</button></div>` : '')).join('');
   return `
   <div class="page-head">
     <div><span class="eyebrow pulse-dot">Antrenman devam ediyor</span><h1>${esc(a.title)}</h1></div>
@@ -462,11 +466,41 @@ function activeWorkoutView(a) {
     <div class="sb-actions">
       <button class="btn btn-ghost btn-sm" data-action="ex-picker">${icon('plus')} Egzersiz Ekle</button>
       <button class="btn btn-ghost btn-sm" data-action="rest-start" data-sec="${S().settings.restDefault}">${icon('timer')} Dinlenme</button>
+      <button class="btn btn-ghost btn-sm" data-action="go" data-to="tools">${icon('calc')} Araçlar</button>
       <button class="btn btn-ghost btn-sm danger-text" data-action="cancel-workout">${icon('x')} İptal</button>
     </div>
   </div>
-  ${a.exercises.length ? a.exercises.map(exerciseBlock).join('') : `<div class="card">${emptyState('dumbbell', 'Henüz egzersiz eklenmedi', 'Kütüphaneden egzersiz ekleyerek antrenmanını oluştur.', `<button class="btn btn-primary" data-action="ex-picker">${icon('plus')} Egzersiz Ekle</button>`)}</div>`}
+  ${a.exercises.length ? blocks : `<div class="card">${emptyState('dumbbell', 'Henüz egzersiz eklenmedi', 'Kütüphaneden egzersiz ekleyerek antrenmanını oluştur.', `<button class="btn btn-primary" data-action="ex-picker">${icon('plus')} Egzersiz Ekle</button>`)}</div>`}
+  <div class="card">
+    <div class="card-head"><span class="card-title">${icon('edit')} Antrenman Notu</span><span class="muted sm">İsteğe bağlı</span></div>
+    <textarea class="note-input" data-input="session-note" rows="2" maxlength="500" placeholder="Bugün nasıl hissettin? Ağrı, enerji, uyku…">${esc(a.note || '')}</textarea>
+  </div>
   <div class="finish-bar"><button class="btn btn-primary btn-block btn-lg" data-action="finish-workout">${icon('check')} Antrenmanı Bitir ve Kaydet</button></div>`;
+}
+
+/* Kademeli yüklenme önerisi: geçen antrenmanda tüm çalışma setlerinde hedefin üst sınırına ulaşıldıysa ağırlık artır */
+function topReps(target) {
+  const m = String(target).match(/(\d+)\s*-\s*(\d+)/);
+  if (m) return +m[2];
+  const n = parseInt(target, 10);
+  return /sn|dk/.test(String(target)) ? 0 : (n || 0);
+}
+function overloadSuggestion(ex, e, last) {
+  if (!last || ex.bodyweight) return null;
+  const upper = topReps(e.target);
+  const sets = last.sets.filter(st => st.t !== 'w' && st.t !== 'd');
+  if (!upper || !sets.length) return null;
+  const kg = Math.max(...sets.map(st => st.kg));
+  if (!kg) return null;
+  if (!sets.every(st => st.reps >= upper)) return null;
+  const inc = ex.region === 'lower' && /barbell|makine/i.test(ex.equipment) ? 5 : 2.5;
+  return { kg: kg + inc, from: kg };
+}
+function setLabel(st, idx) {
+  if (st.t === 'w') return 'I';
+  if (st.t === 'd') return 'D';
+  if (st.t === 'f') return 'B';
+  return String(idx);
 }
 
 function exerciseBlock(e, ei) {
@@ -474,21 +508,29 @@ function exerciseBlock(e, ei) {
   const last = Store.lastPerformance(e.ex);
   const doneN = e.sets.filter(st => st.done).length;
   const complete = e.sets.length && doneN === e.sets.length;
-  return `<div class="card ex-block${complete ? ' is-complete' : ''}">
+  const sug = overloadSuggestion(ex, e, last);
+  const firstPending = e.sets.find(st => !st.done && st.t !== 'w');
+  const showSug = sug && firstPending && (+firstPending.kg || 0) < sug.kg;
+  let n = 0, wi = 0;
+  return `<div class="card ex-block${complete ? ' is-complete' : ''}${e.ss ? ' is-ss' : ''}">
     <div class="ex-head">
       ${thumb(ex)}
       <div class="li-body"><a class="li-title" href="#/exercise/${ex.id}">${esc(ex.name)}</a>
-        <span class="li-sub">Hedef: ${e.sets.length} set × ${esc(e.target)} · ${doneN}/${e.sets.length} tamamlandı${last ? ` · Son: ${DateUtil.formatShort(last.date)}` : ''}</span></div>
+        <span class="li-sub">Hedef: ${e.sets.filter(st => st.t !== 'w').length} set × ${esc(e.target)} · ${doneN}/${e.sets.length} tamamlandı${last ? ` · Son: ${DateUtil.formatShort(last.date)}` : ''}</span></div>
       ${complete ? `<span class="badge badge-green">${icon('check')} Bitti</span>` : ''}
-      <button class="btn-icon sm" data-action="ex-remove" data-ei="${ei}" aria-label="Egzersizi kaldır">${icon('trash')}</button>
+      <button class="btn-icon sm" data-action="ex-menu" data-ei="${ei}" aria-label="Egzersiz seçenekleri"><svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     </div>
+    ${showSug ? `<div class="ex-suggest">${icon('zap')}<span>Geçen sefer tüm setlerde hedefe ulaştın. <b>${fmt(sug.kg)} kg</b> dene!</span><button class="btn btn-sm btn-primary" data-action="apply-suggest" data-ei="${ei}" data-kg="${sug.kg}">Uygula</button></div>` : ''}
+    ${e.note ? `<div class="ex-note">${icon('edit')}<span>${esc(e.note)}</span></div>` : ''}
     <div class="set-table">
       <div class="set-row set-head"><span>Set</span><span>Önceki</span><span>kg</span><span>Tekrar</span><span>✓</span></div>
       ${e.sets.map((st, si) => {
-        const prev = last && last.sets[si];
-        return `<div class="set-row${st.done ? ' done' : ''}">
-          <span class="set-no">${si + 1}</span>
-          <span class="set-prev">${prev ? (prev.kg ? `${fmt(prev.kg)} × ${prev.reps}` : `${prev.reps} tkr`) : '—'}</span>
+        const isWork = st.t !== 'w';
+        if (isWork) n++; else wi++;
+        const prev = last && isWork ? last.sets[n - 1] : null;
+        return `<div class="set-row${st.done ? ' done' : ''}${st.t ? ' t-' + st.t : ''}">
+          <button class="set-no" data-action="set-opts" data-ei="${ei}" data-si="${si}" aria-label="Set seçenekleri">${setLabel(st, n)}${st.rpe ? `<sup>${st.rpe}</sup>` : ''}</button>
+          <span class="set-prev">${prev ? (prev.kg ? `${fmt(prev.kg)} × ${prev.reps}` : `${prev.reps} tkr`) : st.t === 'w' ? 'Isınma' : '—'}</span>
           <input type="number" inputmode="decimal" step="0.5" min="0" max="999" value="${esc(st.kg)}" placeholder="${ex.bodyweight ? 'VA' : '0'}" data-set data-ei="${ei}" data-si="${si}" data-f="kg" aria-label="Set ${si + 1} ağırlık">
           <input type="number" inputmode="numeric" step="1" min="0" max="999" value="${esc(st.reps)}" data-set data-ei="${ei}" data-si="${si}" data-f="reps" aria-label="Set ${si + 1} tekrar">
           <button class="set-check" data-action="set-toggle" data-ei="${ei}" data-si="${si}" aria-label="Set ${si + 1} tamamla" aria-pressed="${st.done}">${icon('check')}</button>
@@ -499,6 +541,7 @@ function exerciseBlock(e, ei) {
       <button class="btn btn-ghost btn-sm" data-action="set-add" data-ei="${ei}">${icon('plus')} Set</button>
       <button class="btn btn-ghost btn-sm" data-action="set-remove" data-ei="${ei}" ${e.sets.length <= 1 ? 'disabled' : ''}>${icon('minus')} Set</button>
       <button class="btn btn-ghost btn-sm" data-action="rest-start" data-sec="${ex.rest}">${icon('timer')} ${ex.rest} sn</button>
+      <button class="btn btn-ghost btn-sm" data-action="ex-menu" data-ei="${ei}">Isınma · Dropset · Süperset</button>
     </div>
   </div>`;
 }
@@ -725,10 +768,17 @@ function pageNutrition() {
       const list = items.filter(f => f.meal === m);
       const kc = list.reduce((a, f) => a + f.kcal, 0);
       return `<div class="meal">
-        <div class="meal-head"><b>${m}</b><span class="muted">${fmt(kc)} kcal</span><button class="btn-icon sm" data-action="food-open" data-meal="${m}" aria-label="${m} için ekle">${icon('plus')}</button></div>
+        <div class="meal-head"><b>${m}</b><span class="muted">${fmt(kc)} kcal</span>
+          ${Store.foodOf(DateUtil.addDays(d, -1)).some(f => f.meal === m) ? `<button class="btn-icon sm" data-action="meal-copy" data-meal="${m}" title="Dünden kopyala" aria-label="${m}: dünden kopyala">${icon('copy')}</button>` : ''}
+          <button class="btn-icon sm" data-action="food-open" data-meal="${m}" aria-label="${m} için ekle">${icon('plus')}</button></div>
         ${list.length ? list.map(foodRow).join('') : '<div class="meal-empty muted">Henüz eklenmedi</div>'}
       </div>`;
     }).join('')}</div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">${icon('star')} Favori Öğünler</span><span class="muted sm">Tek dokunuşla ekle</span></div>
+    ${(s.favorites || []).length ? `<div class="fav-list">${s.favorites.map(f => `<div class="fav-chip"><button data-action="fav-add" data-id="${f.id}"><b>${esc(f.name)}</b><small>${fmt(f.kcal)} kcal · P ${fmt(f.protein)} g</small></button><button class="fav-x" data-action="fav-del" data-id="${f.id}" aria-label="Favoriden çıkar">${icon('x')}</button></div>`).join('')}</div>`
+      : `<p class="muted sm">Yemek eklerken "Favorilerime ekle" kutusunu işaretle; sık yediklerin burada tek dokunuşla eklenir.</p>`}
   </div>
   <div class="grid g-3">
     ${statCard({ ic: 'shaker', label: 'Protein Takibi', value: `${fmt(Math.round(Store.totals(t).protein))} <small>g</small>`, sub: 'Bugün', to: 'protein', tone: 'violet' })}
@@ -744,18 +794,34 @@ function foodRow(f, date = ui.nutDate) {
   </div>`;
 }
 
+function foodResults(q = '', cat = 'Tümü') {
+  const s = S();
+  const words = trLower(q).trim().split(/\s+/).filter(Boolean);
+  const match = (name) => !words.length || words.every(w => trLower(name).includes(w));
+  const favs = (s.favorites || []).filter(f => (cat === 'Tümü' || cat === 'Favoriler') && match(f.name));
+  const foods = cat === 'Favoriler' ? [] : FOODS.map((f, i) => ({ f, i })).filter(({ f }) => (cat === 'Tümü' || f.cat === cat) && match(f.name));
+  const row = (f, attr, star) => `<button type="button" class="food-opt" ${attr}><span>${star ? icon('star') : ''}${esc(f.name)}</span><small>${fmt(f.kcal)} kcal · P ${fmt(f.protein)} g</small></button>`;
+  const html = favs.map(f => row(f, `data-action="food-pick" data-fav="${f.id}"`, true)).join('') + foods.slice(0, 60).map(({ f, i }) => row(f, `data-action="food-pick" data-i="${i}"`, false)).join('');
+  return html || `<p class="hint center">Sonuç yok — değerleri aşağıya elle girebilirsin.</p>`;
+}
+
 function openFoodModal(meal = '', preset = null) {
   const hour = new Date().getHours();
   const autoMeal = meal || (hour < 11 ? 'Kahvaltı' : hour < 15 ? 'Öğle Yemeği' : hour < 21 ? 'Akşam Yemeği' : 'Ara Öğün');
   const p = preset || {};
+  ui.foodBase = preset && preset.base ? preset.base : null;
+  ui.foodCat = (S().favorites || []).length ? 'Tümü' : 'Tümü';
   openModal('Yemek Ekle', `
     <form data-form="food" class="form" autocomplete="off">
-      <div class="field"><label>Hazır besin (isteğe bağlı)</label>
-        <select name="preset" data-change="food-preset"><option value="">— Elle gir —</option>
-        ${FOODS.map((f, i) => `<option value="${i}">${esc(f.name)} · ${f.kcal} kcal</option>`).join('')}</select></div>
+      <div class="food-search">
+        <div class="search">${icon('search')}<input type="search" data-input="food-search" placeholder="Besin ara… (tavuk, lahmacun, yulaf)" aria-label="Besin ara"></div>
+        <button type="button" class="btn btn-ghost" data-action="barcode-open" data-meal="${autoMeal}" aria-label="Barkod okut">${icon('barcode')}<span class="hide-sm">Barkod</span></button>
+      </div>
+      <div class="chips picker-chips" id="foodCats">${['Tümü', ...((S().favorites || []).length ? ['Favoriler'] : []), ...FOOD_CATEGORIES].map(c => `<button type="button" class="chip${c === 'Tümü' ? ' active' : ''}" data-action="food-cat" data-c="${c}">${c === 'Favoriler' ? '★ ' : ''}${c}</button>`).join('')}</div>
+      <div class="food-results" id="foodResults">${foodResults()}</div>
       <div class="form-row">
         <div class="field grow"><label>Besin adı</label><input name="name" required maxlength="60" placeholder="Örn. Tavuklu salata" value="${esc(p.name || '')}"></div>
-        <div class="field w-sm"><label>Porsiyon</label><input name="portion" type="number" min="0.25" step="0.25" value="1" data-change="food-preset"></div>
+        <div class="field w-sm"><label>${p.unit ? esc(p.unit) : 'Porsiyon'}</label><input name="portion" type="number" min="0.1" step="any" value="${p.portion || 1}" data-input="food-portion"></div>
       </div>
       <div class="field"><label>Öğün</label><select name="meal">${MEAL_TYPES.map(m => `<option${m === autoMeal ? ' selected' : ''}>${m}</option>`).join('')}</select></div>
       <div class="form-row four">
@@ -764,9 +830,20 @@ function openFoodModal(meal = '', preset = null) {
         <div class="field"><label>Karb. (g)</label><input name="carbs" type="number" min="0" step="0.1" value="${p.carbs ?? ''}"></div>
         <div class="field"><label>Yağ (g)</label><input name="fat" type="number" min="0" step="0.1" value="${p.fat ?? ''}"></div>
       </div>
+      <label class="check-row"><input type="checkbox" name="fav"><span>${icon('star')} Favorilerime ekle (tek dokunuşla tekrar eklemek için)</span></label>
       <p class="hint">Hazır besin değerleri yaklaşıktır; ürün etiketine göre düzenleyebilirsin.</p>
       <div class="modal-actions"><button type="button" class="btn btn-ghost" data-action="modal-close">Vazgeç</button><button class="btn btn-primary" type="submit">${icon('plus')} Ekle</button></div>
-    </form>`);
+    </form>`, { wide: true });
+}
+function applyFoodBase(form) {
+  const b = ui.foodBase;
+  if (!b) return;
+  const k = (+form.portion.value || 1) / (b.per || 1);
+  form.name.value = b.label ? `${b.label}${b.per ? ` (${form.portion.value} ${b.unitShort || 'g'})` : (k === 1 ? '' : ` ×${String(+k.toFixed(2)).replace('.', ',')}`)}` : form.name.value;
+  form.kcal.value = Math.round(b.kcal * k);
+  form.protein.value = round1(b.protein * k);
+  form.carbs.value = round1(b.carbs * k);
+  form.fat.value = round1(b.fat * k);
 }
 
 /* 6) Protein Takibi */
@@ -921,7 +998,7 @@ function pageWater() {
         <button class="btn btn-ghost" type="submit">Kaydet</button></form>
       ${w ? `<p class="hint">Genel öneri: kilogram başına yaklaşık 30–40 ml. ${fmt(w)} kg için ≈ <b>${fmt(Math.round(w * 35 / 50) * 50)} ml</b>. Antrenman günlerinde biraz daha fazlası gerekebilir.</p>` : ''}
       <div class="set-item mt"><span class="si-ic">${icon('bell')}</span><div class="si-body"><b>Su hatırlatıcı</b><small>Uygulama açıkken her 2 saatte bir hatırlatır</small></div>
-        <label class="switch"><input type="checkbox" data-change="setting-bool" data-key="reminders"${s.settings.reminders ? ' checked' : ''}><span></span></label></div>
+        <label class="switch"><input type="checkbox" data-change="setting-bool" data-key="notifyWater"${s.settings.notifyWater ? ' checked' : ''}><span></span></label></div>
     </div>
   </div>`;
 }
@@ -1174,8 +1251,11 @@ function pageSettings() {
       <div class="card">
         <div class="card-head"><span class="card-title">${icon('moon')} Görünüm ve Bildirimler</span></div>
         <div class="set-item"><span class="si-ic">${icon('moon')}</span><div class="si-body"><b>Tema</b><small>Koyu lacivert veya tam siyah</small></div>
-          <div class="seg sm"><button class="seg-btn${st.theme !== 'amoled' ? ' active' : ''}" data-action="theme" data-v="dark">Koyu</button><button class="seg-btn${st.theme === 'amoled' ? ' active' : ''}" data-action="theme" data-v="amoled">Siyah</button></div></div>
-        ${toggle('reminders', 'bell', 'Su hatırlatıcı', 'Uygulama açıkken her 2 saatte bir')}
+          <div class="seg sm"><button class="seg-btn${st.theme === 'dark' || !st.theme ? ' active' : ''}" data-action="theme" data-v="dark">Koyu</button><button class="seg-btn${st.theme === 'amoled' ? ' active' : ''}" data-action="theme" data-v="amoled">Siyah</button><button class="seg-btn${st.theme === 'light' ? ' active' : ''}" data-action="theme" data-v="light">Açık</button></div></div>
+        ${toggle('notifyWater', 'drop', 'Su hatırlatıcı', IN_APP ? '09:00–21:00 arası 2 saatte bir bildirim (uygulama kapalıyken de)' : 'Uygulama açıkken 2 saatte bir')}
+        ${toggle('notifyWorkout', 'bell', 'Antrenman hatırlatıcı', IN_APP ? 'Antrenman günlerinde seçtiğin saatte bildirim' : 'Yalnızca Android uygulamasında')}
+        <div class="set-item"><span class="si-ic">${icon('clock')}</span><div class="si-body"><b>Antrenman bildirimi saati</b><small>Program günlerinde</small></div>
+          <select data-change="setting-str" data-key="workoutTime" aria-label="Bildirim saati">${Array.from({ length: 17 }, (_, i) => `${String(i + 6).padStart(2, '0')}:00`).flatMap(h => [h, h.replace(':00', ':30')]).map(t => `<option${t === (st.workoutTime || '18:00') ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
         ${link('widget-help', 'grid', 'Ana ekran widget\'ı', 'Su, protein ve kalori özetini ana ekranda gör')}
       </div>
       <div class="card">
@@ -1188,7 +1268,7 @@ function pageSettings() {
       </div>
       <div class="card">
         <div class="card-head"><span class="card-title">${icon('info')} Hakkında</span></div>
-        ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v1.3.0')}
+        ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v2.0.0')}
         ${link('privacy', 'shield', 'Gizlilik', 'Verilerin yalnızca bu cihazda saklanır')}
       </div>
       <div class="card brand-card">
@@ -1284,6 +1364,10 @@ function startWorkout(tpl) {
   else go2();
 }
 
+/* Ek modüllerin (extras.js) girdi/değişim işleyicileri */
+const EXTRA_INPUTS = {};
+const EXTRA_CHANGES = {};
+
 const ACTIONS = {
   'go': (el) => go(el.dataset.to),
   'ex-frame': (el) => { el.classList.toggle('manual'); el.classList.toggle('show1'); },
@@ -1305,7 +1389,11 @@ const ACTIONS = {
       buzz(40);
       const allDone = a.exercises.every(x => x.sets.every(y => y.done));
       if (allDone) toast('Tüm setler tamamlandı! Antrenmanı bitirip kaydedebilirsin 🏆');
-      else if (S().settings.autoRest) Rest.start(EX_BY_ID[e.ex].rest || S().settings.restDefault);
+      else if (S().settings.autoRest) {
+        const ei = +el.dataset.ei;
+        if (e.ss && ei < a.exercises.length - 1) toast(`Süperset: şimdi ${esc(EX_BY_ID[a.exercises[ei + 1].ex].name)} 🔁`, 'info');
+        else if (st.t !== 'w') Rest.start(EX_BY_ID[e.ex].rest || S().settings.restDefault);
+      }
     }
     rerender();
   },
@@ -1496,7 +1584,7 @@ const ACTIONS = {
   }),
   'about': () => openModal('FITTRACK Hakkında', `
     <div class="about"><div class="brand big">${icon('dumbbell')}<span class="brand-text">FIT<span>TRACK</span></span></div>
-    <p class="muted">Sürüm 1.3.0 · Daha güçlü bir sen.</p>
+    <p class="muted">Sürüm 2.0.0 · Daha güçlü bir sen.</p>
     <p>FITTRACK; üst/alt vücut bölünmüş antrenman programı, set–tekrar–ağırlık takibi, dinlenme sayacı, beslenme, protein, kalori ve su takibini tek bir yerde toplayan, tamamen çevrimdışı çalışan bir fitness uygulamasıdır.</p>
     <p class="hint">Egzersiz fotoğrafları: Free Exercise DB (kamu malı, Unlicense). HTML5, CSS3 ve saf JavaScript ile geliştirilmiştir. Kalori ve vücut yağı hesaplamaları tahminidir; tıbbi tavsiye yerine geçmez.</p></div>`),
   'privacy': () => openModal('Gizlilik', `
@@ -1507,6 +1595,11 @@ const ACTIONS = {
 
 const FORMS = {
   food(d) {
+    if (d.fav) {
+      const favs = S().favorites || (S().favorites = []);
+      const nm = d.name.trim();
+      if (!favs.some(f => f.name === nm)) favs.push({ id: uid(), name: nm, kcal: Math.round(+d.kcal || 0), protein: round1(+d.protein || 0), carbs: round1(+d.carbs || 0), fat: round1(+d.fat || 0) });
+    }
     Store.addFood(ui.nutDate && currentPage === 'nutrition' ? ui.nutDate : DateUtil.today(), d);
     closeModal(); rerender(); toast(`${esc(d.name)} eklendi`);
   },
@@ -1625,13 +1718,19 @@ document.addEventListener('change', (e) => {
   const el = e.target;
   const kind = el.dataset.change;
   if (!kind) return;
+  if (EXTRA_CHANGES[kind]) { EXTRA_CHANGES[kind](el); return; }
   if (kind === 'setting-bool') {
     S().settings[el.dataset.key] = el.checked; Store.save();
-    if (el.dataset.key === 'reminders' && el.checked) toast('Su hatırlatıcı açıldı', 'info');
+    if (/^notify/.test(el.dataset.key) && el.checked) {
+      if (window.FitBridge && window.FitBridge.requestNotifPermission) { try { window.FitBridge.requestNotifPermission(); } catch (e) { /* yok */ } }
+      toast(el.dataset.key === 'notifyWater' ? 'Su hatırlatıcı açıldı 💧' : 'Antrenman hatırlatıcı açıldı 💪', 'info');
+    }
   } else if (kind === 'program-select') {
     ACTIONS['program-set']({ dataset: { id: el.value } });
   } else if (kind === 'lib-equip') {
     ui.libEquip = el.value; ui.libLimit = 40; $('#libList').innerHTML = libraryList();
+  } else if (kind === 'setting-str') {
+    S().settings[el.dataset.key] = el.value; Store.save(); toast('Ayar kaydedildi');
   } else if (kind === 'setting-num') {
     S().settings[el.dataset.key] = +el.value; Store.save(); toast('Ayar kaydedildi');
   } else if (kind === 'tpl-field') {
@@ -1639,16 +1738,6 @@ document.addEventListener('change', (e) => {
     if (el.dataset.f === 'sets') it.sets = clamp(parseInt(el.value, 10) || 1, 1, 10);
     else it.reps = el.value.trim() || '10';
     Store.save(); rerender();
-  } else if (kind === 'food-preset') {
-    const form = el.closest('form');
-    const idx = form.preset.value;
-    if (idx === '') return;
-    const f = FOODS[+idx], k = +form.portion.value || 1;
-    form.name.value = k === 1 ? f.name : `${f.name} ×${String(k).replace('.', ',')}`;
-    form.kcal.value = Math.round(f.kcal * k);
-    form.protein.value = round1(f.protein * k);
-    form.carbs.value = round1(f.carbs * k);
-    form.fat.value = round1(f.fat * k);
   } else if (kind === 'import-file') {
     const file = el.files && el.files[0];
     if (!file) return;
@@ -1661,6 +1750,7 @@ document.addEventListener('change', (e) => {
 let saveTimer = null;
 document.addEventListener('input', (e) => {
   const el = e.target;
+  if (el.dataset.input && EXTRA_INPUTS[el.dataset.input]) { EXTRA_INPUTS[el.dataset.input](el); return; }
   if (el.hasAttribute('data-set')) {
     const a = S().active; if (!a) return;
     const st = a.exercises[+el.dataset.ei].sets[+el.dataset.si];
@@ -1669,6 +1759,13 @@ document.addEventListener('input', (e) => {
   } else if (el.dataset.input === 'lib-search') {
     ui.libQuery = el.value; ui.libLimit = 40;
     clearTimeout(saveTimer); saveTimer = setTimeout(() => { $('#libList').innerHTML = libraryList(); }, 120);
+  } else if (el.dataset.input === 'food-search') {
+    ui.foodQuery = el.value;
+    const r = $('#foodResults'); if (r) r.innerHTML = foodResults(el.value, ui.foodCat || 'Tümü');
+  } else if (el.dataset.input === 'food-portion') {
+    applyFoodBase(el.closest('form'));
+  } else if (el.dataset.input === 'session-note') {
+    if (S().active) { S().active.note = el.value; clearTimeout(saveTimer); saveTimer = setTimeout(() => Store.save(), 400); }
   } else if (el.dataset.input === 'picker-search') {
     ui.pickQuery = el.value;
     clearTimeout(saveTimer); saveTimer = setTimeout(() => { const pl = $('#pickerList'); if (pl) { pl.innerHTML = pickerList(); pl.scrollTop = 0; } }, 120);
@@ -1716,12 +1813,15 @@ window.fitOnResume = function () {
 
 /* ---------------- Tema / hatırlatıcı ---------------- */
 function applyTheme() {
-  document.documentElement.dataset.theme = S().settings.theme === 'amoled' ? 'amoled' : 'dark';
+  const th = S().settings.theme;
+  document.documentElement.dataset.theme = th === 'amoled' || th === 'light' ? th : 'dark';
+  const meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.content = th === 'light' ? '#f3f5fa' : th === 'amoled' ? '#000000' : '#07090f';
 }
 let lastReminder = Date.now();
 function reminderTick() {
   const s = S();
-  if (!s.settings.reminders) return;
+  if (!s.settings.notifyWater || window.FitBridge) return;
   const h = new Date().getHours();
   if (Date.now() - lastReminder >= 2 * 3600 * 1000 && h >= 8 && h <= 22) {
     lastReminder = Date.now();
