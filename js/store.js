@@ -38,11 +38,12 @@ function defaultState() {
     demo: false,
     profile: { name: '', gender: 'male', age: null, height: null, weight: null, goalWeight: null, activity: 1.55, goals: ['muscle'], createdAt: DateUtil.today() },
     settings: {
-      days: 3, kcalGoal: 2500, proteinGoal: 150, carbGoal: 300, fatGoal: 80, waterGoal: 3000,
+      days: 3, program: 'ul3', kcalGoal: 2500, proteinGoal: 150, carbGoal: 300, fatGoal: 80, waterGoal: 3000,
       restDefault: 90, autoRest: true, sound: true, vibrate: true, theme: 'dark', reminders: false,
       programStart: DateUtil.weekStart()
     },
     templates: clone(DEFAULT_TEMPLATES),
+    programs: [],   // özel programlar: {id,name,schedule:[tplKey|null ×7]}
     sessions: [],   // tamamlanan antrenmanlar
     active: null,   // devam eden antrenman
     food: {},       // { 'YYYY-MM-DD': [ {id,name,meal,kcal,protein,carbs,fat,time} ] }
@@ -58,7 +59,10 @@ function migrate(s) {
   out.profile = Object.assign(defaultState().profile, s.profile || {});
   out.settings = Object.assign(defaultState().settings, s.settings || {});
   out.templates = Object.assign(clone(DEFAULT_TEMPLATES), s.templates || {});
-  ['sessions', 'weights'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+  if (!out.settings.program || (!BUILTIN_PROGRAMS[out.settings.program] && !(s.programs || []).some(p => p.id === out.settings.program))) {
+    out.settings.program = out.settings.days === 4 ? 'ul4' : 'ul3';
+  }
+  ['sessions', 'weights', 'programs'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
   ['food', 'water'].forEach(k => { if (!out[k] || typeof out[k] !== 'object') out[k] = {}; });
   return out;
 }
@@ -152,20 +156,78 @@ const Store = {
 
   /* ---------------- Program / takvim ---------------- */
   /* Bir haftanın planı: 3 gün → üst/alt/üst şeklinde dönerek devam eder */
+  /* ---------------- Programlar ---------------- */
+  programs() {
+    return [
+      ...Object.entries(BUILTIN_PROGRAMS).map(([id, p]) => ({ id, name: p.name, desc: p.desc, builtin: true })),
+      ...this.state.programs
+    ];
+  },
+  activeProgram() { return this.programs().find(p => p.id === this.state.settings.program) || this.programs()[0]; },
+  setProgram(id) {
+    this.state.settings.program = id;
+    if (BUILTIN_PROGRAMS[id]) this.state.settings.days = BUILTIN_PROGRAMS[id].days;
+    this.save();
+  },
+  saveProgram({ id, name, schedule }) {
+    let p = this.state.programs.find(x => x.id === id);
+    if (!p) { p = { id: 'p_' + uid() }; this.state.programs.push(p); }
+    p.name = (name || 'Programım').trim();
+    p.schedule = schedule.map(k => (k && this.state.templates[k] ? k : null));
+    this.save();
+    return p;
+  },
+  deleteProgram(id) {
+    this.state.programs = this.state.programs.filter(p => p.id !== id);
+    if (this.state.settings.program === id) this.setProgram('ul3');
+    this.save();
+  },
+  /* Bir programın haftalık gün → antrenman eşlemesi (hazır programlarda haftaya göre değişir) */
+  programSchedule(pid, weekStartKey) {
+    if (BUILTIN_PROGRAMS[pid]) {
+      const days = BUILTIN_PROGRAMS[pid].days;
+      const slots = SCHEDULE_SLOTS[days];
+      const weekIndex = Math.floor(DateUtil.diffDays(weekStartKey, this.state.settings.programStart) / 7);
+      return Array.from({ length: 7 }, (_, i) => {
+        const slot = slots.indexOf(i);
+        if (slot === -1) return null;
+        return TEMPLATE_ORDER[days === 4 ? slot : (((weekIndex * 3 + slot) % 4) + 4) % 4];
+      });
+    }
+    const p = this.state.programs.find(x => x.id === pid);
+    return Array.from({ length: 7 }, (_, i) => (p && p.schedule[i] && this.state.templates[p.schedule[i]]) ? p.schedule[i] : null);
+  },
+  daysPerWeek() { return this.programSchedule(this.state.settings.program, DateUtil.weekStart()).filter(Boolean).length; },
+
+  /* ---------------- Antrenman şablonları ---------------- */
+  templateKeys() { return [...TEMPLATE_ORDER, ...Object.keys(this.state.templates).filter(k => !TEMPLATE_ORDER.includes(k))]; },
+  createTemplate(name, type = 'full', focus = '') {
+    const key = 'c_' + uid();
+    this.state.templates[key] = { name: (name || 'Yeni Antrenman').trim(), type, focus: (focus || 'Özel antrenman').trim(), items: [], custom: true };
+    this.save();
+    return key;
+  },
+  updateTemplate(key, { name, type, focus }) {
+    const t = this.state.templates[key];
+    if (!t) return;
+    if (name) t.name = name.trim();
+    if (type) t.type = type;
+    if (focus != null) t.focus = focus.trim() || t.focus;
+    this.save();
+  },
+  deleteTemplate(key) {
+    if (TEMPLATE_ORDER.includes(key)) return;
+    delete this.state.templates[key];
+    this.state.programs.forEach(p => { p.schedule = p.schedule.map(k => (k === key ? null : k)); });
+    this.save();
+  },
+
   weekPlan(weekStartKey = DateUtil.weekStart()) {
-    const days = this.state.settings.days === 4 ? 4 : 3;
-    const slots = SCHEDULE_SLOTS[days];
-    const weekIndex = Math.floor(DateUtil.diffDays(weekStartKey, this.state.settings.programStart) / 7);
+    const sched = this.programSchedule(this.state.settings.program, weekStartKey);
     return Array.from({ length: 7 }, (_, i) => {
       const date = DateUtil.addDays(weekStartKey, i);
-      const slot = slots.indexOf(i);
-      let tpl = null;
-      if (slot !== -1) {
-        const idx = days === 4 ? slot : (((weekIndex * 3 + slot) % 4) + 4) % 4;
-        tpl = TEMPLATE_ORDER[idx];
-      }
-      const done = this.state.sessions.some(s => s.date === date);
-      return { date, dayIdx: i, tpl, done };
+      const done = this.state.sessions.some(x => x.date === date);
+      return { date, dayIdx: i, tpl: sched[i], done };
     });
   },
   todayPlan() { const t = DateUtil.today(); return this.weekPlan().find(d => d.date === t); },

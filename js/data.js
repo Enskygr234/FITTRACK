@@ -65,8 +65,8 @@ const ICONS = {
 };
 
 /* ---------- Kas grupları ---------- */
-const MUSCLE_GROUPS = ['Göğüs', 'Sırt', 'Omuz', 'Kol', 'Bacak', 'Karın'];
-const GROUP_ICON = { 'Göğüs': 'g_chest', 'Sırt': 'g_back', 'Omuz': 'g_shoulder', 'Kol': 'g_arm', 'Bacak': 'g_leg', 'Karın': 'g_core' };
+const MUSCLE_GROUPS = ['Göğüs', 'Sırt', 'Omuz', 'Kol', 'Bacak', 'Karın', 'Kardiyo', 'Esneme'];
+const GROUP_ICON = { 'Göğüs': 'g_chest', 'Sırt': 'g_back', 'Omuz': 'g_shoulder', 'Kol': 'g_arm', 'Bacak': 'g_leg', 'Karın': 'g_core', 'Kardiyo': 'heart', 'Esneme': 'body' };
 
 const MUSCLE_NAMES = {
   chest: 'Göğüs', frontDelt: 'Ön Omuz', sideDelt: 'Yan Omuz', rearDelt: 'Arka Omuz',
@@ -200,8 +200,23 @@ const EXERCISES = [
     tips: ['Hareketi kalçadan değil omurgayı bükerek yap.'] }
 ];
 
-/* Fotoğraflar: Free Exercise DB (kamu malı / Unlicense) — 0: başlangıç, 1: bitiş pozisyonu */
-EXERCISES.forEach(e => { e.img = [`assets/img/ex/${e.id}-0.jpg`, `assets/img/ex/${e.id}-1.jpg`]; });
+/* Fotoğraflar: Free Exercise DB (kamu malı / Unlicense) — 0: başlangıç, 1: bitiş pozisyonu
+   Temel 28 egzersizin fotoğrafları uygulamayla gelir; diğerlerinin küçük resmi yereldir,
+   büyük fotoğrafları internet varsa CDN'den yüklenir. */
+const IMG_CDN = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/';
+EXERCISES.forEach(e => {
+  e.core = true;
+  e.img = [`assets/img/ex/${e.id}-0.jpg`, `assets/img/ex/${e.id}-1.jpg`];
+  e.thumb = e.img[0];
+});
+(typeof EXTRA_EXERCISES !== 'undefined' ? EXTRA_EXERCISES : []).forEach(x => {
+  EXERCISES.push(Object.assign(x, {
+    bodyweight: x.bw, tips: [], en: true,
+    thumb: `assets/img/th/${x.id}.jpg`,
+    img: [`${IMG_CDN}${x.id}/0.jpg`, `${IMG_CDN}${x.id}/1.jpg`]
+  }));
+});
+const EQUIPMENTS = [...new Set(EXERCISES.map(e => e.equipment.split(/[,(]/)[0].trim()))].sort((a, b) => a.localeCompare(b, 'tr'));
 const EX_BY_ID = Object.fromEntries(EXERCISES.map(e => [e.id, e]));
 const tplPhoto = (tpl) => { const it = tpl && tpl.items[0]; return it && EX_BY_ID[it.ex] ? EX_BY_ID[it.ex].img[1] : 'assets/img/ex/bench-press-1.jpg'; };
 
@@ -241,6 +256,23 @@ const DEFAULT_TEMPLATES = {
   ] }
 };
 const TEMPLATE_ORDER = ['upperA', 'lowerA', 'upperB', 'lowerB'];
+
+/* Antrenman türleri: etiket, kısa etiket, rozet rengi */
+const TPL_TYPES = {
+  upper: { label: 'Üst Vücut', short: 'Üst', badge: 'badge-red' },
+  lower: { label: 'Alt Vücut', short: 'Alt', badge: 'badge-blue' },
+  full: { label: 'Tüm Vücut', short: 'Tüm', badge: 'badge-violet' },
+  push: { label: 'İtiş', short: 'İtiş', badge: 'badge-orange' },
+  pull: { label: 'Çekiş', short: 'Çekiş', badge: 'badge-green' },
+  legs: { label: 'Bacak', short: 'Bacak', badge: 'badge-blue' },
+  cardio: { label: 'Kardiyo', short: 'Kardiyo', badge: 'badge-gray' }
+};
+
+/* Hazır programlar (özel programlar state.programs içinde tutulur) */
+const BUILTIN_PROGRAMS = {
+  ul3: { name: 'Üst / Alt · 3 Gün', desc: 'Pzt · Çar · Cum — Üst/Alt dönüşümlü', days: 3 },
+  ul4: { name: 'Üst / Alt · 4 Gün', desc: 'Pzt · Sal · Per · Cum — A/B varyasyonlu', days: 4 }
+};
 
 /* Haftanın günleri: 0 = Pazartesi */
 const DAY_NAMES = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];

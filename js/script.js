@@ -36,14 +36,26 @@ function dayLabel(key) {
   if (key === DateUtil.addDays(t, -1)) return 'Dün';
   return DateUtil.format(key);
 }
-const typeBadge = (type) => type === 'upper'
-  ? '<span class="badge badge-red">Üst Vücut</span>'
-  : type === 'lower' ? '<span class="badge badge-blue">Alt Vücut</span>' : '<span class="badge">Serbest</span>';
+const typeBadge = (type) => {
+  const t = TPL_TYPES[type];
+  return t ? `<span class="badge ${t.badge}">${t.label}</span>` : '<span class="badge">Serbest</span>';
+};
 const level = () => {
   const n = S().sessions.length;
   return { lvl: 1 + Math.floor(n / 8), progress: (n % 8) / 8, left: 8 - (n % 8) };
 };
-const thumb = (ex, cls = '') => `<div class="thumb photo ${cls} t-${ex.region}"><img src="${ex.img[0]}" alt="" loading="lazy" decoding="async"></div>`;
+const thumb = (ex, cls = '') => `<div class="thumb photo ${cls} t-${ex.region}"><img src="${ex.thumb}" alt="" loading="lazy" decoding="async"></div>`;
+/* Ortak egzersiz arama/filtreleme (kütüphane ve seçici) */
+const trLower = (x) => String(x).toLocaleLowerCase('tr-TR');
+function filterExercises({ q = '', group = 'Tümü', equip = '' } = {}) {
+  const words = trLower(q).trim().split(/\s+/).filter(Boolean);
+  return EXERCISES.filter(e => (group === 'Tümü' || e.group === group) && (!equip || e.equipment.startsWith(equip)) &&
+    (!words.length || words.every(w => {
+      const hay = `${trLower(e.name)} ${trLower(e.group)} ${trLower(e.equipment)} ${e.muscles.map(m => trLower(MUSCLE_NAMES[m])).join(' ')}`;
+      return hay.includes(w);
+    })));
+}
+const regionBadge = (e) => e.region === 'upper' ? '<span class="badge badge-red">Üst</span>' : e.region === 'lower' ? '<span class="badge badge-blue">Alt</span>' : `<span class="badge badge-violet">${e.group}</span>`;
 const photoBg = (src, cls = '') => `<div class="photo-bg ${cls}" style="background-image:url('${src}')" aria-hidden="true"></div>`;
 const emptyState = (ic, title, text, btn = '') => `<div class="empty">${icon(ic)}<b>${title}</b><p>${text}</p>${btn}</div>`;
 
@@ -68,7 +80,7 @@ TITLES.programs = 'Antrenman Programları';
 
 const ui = {
   nutDate: DateUtil.today(), statsRange: 'week', libGroup: 'Tümü', libQuery: '',
-  progTpl: 'upperA', openSession: null, histAll: false, tdee: null, foodModal: null
+  progTpl: 'upperA', libLimit: 40, libEquip: '', pickQuery: '', pickGroup: 'Tümü', pickTarget: '', openSession: null, histAll: false, tdee: null, foodModal: null
 };
 
 function parseRoute() {
@@ -311,8 +323,8 @@ function pageHome() {
     </div>
     <div class="card week-card">
       <div class="card-head"><span class="card-title">Haftalık Antrenman</span><a href="#/programs" class="card-link">Program ${icon('right')}</a></div>
-      <div class="big-num">${doneDays}<small>/${s.settings.days}</small></div>
-      ${Charts.progress(doneDays, s.settings.days)}
+      <div class="big-num">${doneDays}<small>/${plan.filter(p => p.tpl).length}</small></div>
+      ${Charts.progress(doneDays, plan.filter(p => p.tpl).length || 1)}
       <div class="week-dots">${plan.map(p => `
         <div class="wd${p.tpl ? ' is-plan' : ''}${p.done ? ' is-done' : ''}${p.date === t ? ' is-today' : ''}" title="${DAY_NAMES[p.dayIdx]}${p.tpl ? ' · ' + esc(s.templates[p.tpl].name) : ''}">
           <span>${DAY_SHORT[p.dayIdx]}</span><i></i></div>`).join('')}</div>
@@ -389,8 +401,8 @@ function pageWorkout() {
       <div class="card">
         <div class="card-head"><span class="card-title">Hızlı Başlat</span></div>
         <div class="quick-tpls">
-          ${TEMPLATE_ORDER.map(k => `<button class="qt t-${s.templates[k].type}" data-action="start-workout" data-tpl="${k}">${photoBg(tplPhoto(s.templates[k]), 'qt-photo')}
-            <span class="qt-ic">${icon(s.templates[k].type === 'upper' ? 'g_chest' : 'g_leg')}</span>
+          ${Store.templateKeys().filter(k => s.templates[k].items.length).map(k => `<button class="qt t-${s.templates[k].type}" data-action="start-workout" data-tpl="${k}">${photoBg(tplPhoto(s.templates[k]), 'qt-photo')}
+            <span class="qt-ic">${icon(s.templates[k].type === 'lower' || s.templates[k].type === 'legs' ? 'g_leg' : s.templates[k].type === 'upper' ? 'g_chest' : 'dumbbell')}</span>
             <b>${esc(s.templates[k].name)}</b><small>${s.templates[k].items.length} egzersiz</small></button>`).join('')}
           <button class="qt qt-free" data-action="start-workout" data-tpl=""><span class="qt-ic">${icon('plus')}</span><b>Serbest Antrenman</b><small>Kendin oluştur</small></button>
         </div>
@@ -398,7 +410,7 @@ function pageWorkout() {
       <div class="card">
         <div class="card-head"><span class="card-title">Bu Hafta</span><a href="#/programs" class="card-link">Program ${icon('right')}</a></div>
         <div class="week-strip">${Store.weekPlan().map(p => `<div class="ws${p.tpl ? ' t-' + s.templates[p.tpl].type : ''}${p.done ? ' is-done' : ''}${p.date === DateUtil.today() ? ' is-today' : ''}">
-          <small>${DAY_SHORT[p.dayIdx]}</small><b>${p.tpl ? (s.templates[p.tpl].type === 'upper' ? 'Üst' : 'Alt') : '—'}</b>${p.done ? icon('check') : ''}</div>`).join('')}</div>
+          <small>${DAY_SHORT[p.dayIdx]}</small><b>${p.tpl ? (TPL_TYPES[s.templates[p.tpl].type] || TPL_TYPES.full).short : '—'}</b>${p.done ? icon('check') : ''}</div>`).join('')}</div>
       </div>
     </div>
   </div>
@@ -492,49 +504,81 @@ function exerciseBlock(e, ei) {
 }
 
 /* 3) Antrenman Programları */
+function programDaysText(sched) {
+  const d = sched.map((k, i) => (k ? DAY_SHORT[i] : null)).filter(Boolean);
+  return d.length ? `${d.length} gün · ${d.join(', ')}` : 'Henüz gün atanmadı';
+}
 function pagePrograms() {
   const s = S(), t = DateUtil.today();
   const plan = Store.weekPlan();
   const nextPlan = Store.weekPlan(DateUtil.addDays(DateUtil.weekStart(), 7));
+  const active = Store.activeProgram();
+  if (!s.templates[ui.progTpl]) ui.progTpl = 'upperA';
   const key = ui.progTpl;
   const tpl = s.templates[key];
+  const keys = Store.templateKeys();
   const dayCard = (p) => {
     const tp = p.tpl ? s.templates[p.tpl] : null;
+    const tt = tp ? (TPL_TYPES[tp.type] || TPL_TYPES.full) : null;
     const status = p.done ? `<span class="dc-status ok">${icon('check')} Tamamlandı</span>`
       : p.date === t ? `<span class="dc-status now">${tp ? 'Bugün' : 'Bugün · Dinlenme'}</span>`
       : tp ? (p.date < t ? '<span class="dc-status miss">Kaçırıldı</span>' : '<span class="dc-status">Bekliyor</span>') : '<span class="dc-status">Dinlenme</span>';
     return `<div class="day-card${tp ? ' t-' + tp.type : ' is-rest'}${p.date === t ? ' is-today' : ''}${p.done ? ' is-done' : ''}">
       <span class="dc-day"><span class="full">${DAY_NAMES[p.dayIdx]}</span><span class="short">${DAY_SHORT[p.dayIdx]}</span></span>
-      <b>${tp ? (tp.type === 'upper' ? 'Üst' : 'Alt') + '<span class="full"> Vücut</span>' : '—'}</b>
+      <b>${tt ? `<span class="short">${tt.short}</span><span class="full">${tt.label}</span>` : '—'}</b>
       <small>${tp ? esc(tp.name) : 'Toparlanma'}</small>${status}</div>`;
   };
+  const progCard = (p) => {
+    const sched = Store.programSchedule(p.id, DateUtil.weekStart());
+    const on = p.id === active.id;
+    return `<div class="prog-card${on ? ' active' : ''}">
+      <div class="pc-top"><div class="pc-ic">${icon(p.builtin ? 'calendar' : 'star')}</div>
+        <div class="li-body"><b>${esc(p.name)}</b><small>${p.builtin ? esc(p.desc) : programDaysText(sched)}</small></div>
+        ${on ? '<span class="badge badge-red">Aktif</span>' : ''}</div>
+      <div class="pc-dots">${sched.map((k, i) => `<span class="${k ? 't-' + (s.templates[k] || {}).type : ''}" title="${DAY_NAMES[i]}${k ? ' · ' + esc(s.templates[k].name) : ''}">${DAY_SHORT[i]}</span>`).join('')}</div>
+      <div class="pc-actions">
+        ${on ? '' : `<button class="btn btn-primary btn-sm" data-action="program-set" data-id="${p.id}">${icon('check')} Seç</button>`}
+        ${p.builtin ? '' : `<button class="btn btn-ghost btn-sm" data-action="program-edit" data-id="${p.id}">${icon('edit')} Düzenle</button>
+        <button class="btn-icon sm" data-action="program-delete" data-id="${p.id}" aria-label="Programı sil">${icon('trash')}</button>`}
+      </div>
+    </div>`;
+  };
   return `
-  ${pageHead('Antrenman Programları', 'Üst / alt vücut bölünmüş program — haftada 3 veya 4 gün.')}
+  ${pageHead('Antrenman Programları', 'Hazır üst/alt programlardan birini seç ya da kendi programını oluştur.', `<button class="btn btn-primary" data-action="program-edit">${icon('plus')} Kendi Programını Oluştur</button>`)}
   <div class="card">
-    <div class="seg" role="tablist">
-      <button class="seg-btn${s.settings.days === 3 ? ' active' : ''}" data-action="days-set" data-days="3">3 Gün <small>(Üst/Alt)</small></button>
-      <button class="seg-btn${s.settings.days === 4 ? ' active' : ''}" data-action="days-set" data-days="4">4 Gün <small>(Üst/Alt)</small></button>
+    <div class="card-head"><span class="card-title">${icon('calendar')} Programlarım</span><span class="muted sm">${Store.programs().length} program</span></div>
+    <div class="prog-grid">
+      ${Store.programs().map(progCard).join('')}
+      <button class="prog-card prog-new" data-action="program-edit">${icon('plus')}<b>Yeni Program</b><small>Günleri ve antrenmanları sen belirle</small></button>
     </div>
-    <div class="card-head mt"><span class="card-title">Bu Hafta</span><span class="muted sm">${DateUtil.format(plan[0].date, { year: false })} – ${DateUtil.format(plan[6].date)}</span></div>
-    <div class="day-grid">${plan.map(dayCard).join('')}</div>
-    <div class="card-head mt"><span class="card-title">Gelecek Hafta</span></div>
-    <div class="day-grid compact">${nextPlan.map(dayCard).join('')}</div>
-    <div class="note">${icon('info')}<span>${s.settings.days === 3
-      ? '3 gün seçildiğinde program Pazartesi–Çarşamba–Cuma günleri <b>Üst → Alt → Üst</b> şeklinde başlar ve sonraki hafta <b>Alt → Üst → Alt</b> olarak dönüşümlü devam eder. A/B varyasyonları sırayla uygulanır.'
-      : '4 gün seçildiğinde program Pazartesi (Üst A), Salı (Alt A), Perşembe (Üst B) ve Cuma (Alt B) olarak uygulanır.'}</span></div>
   </div>
 
   <div class="card">
-    <div class="card-head"><span class="card-title">Antrenman Şablonları</span><span class="muted sm">Egzersiz, set ve tekrarları düzenleyebilirsin</span></div>
-    <div class="tabs">${TEMPLATE_ORDER.map(k => `<button class="tab${k === key ? ' active' : ''}" data-action="tpl-tab" data-tpl="${k}">${esc(s.templates[k].name)}</button>`).join('')}</div>
-    <div class="tpl-head"><div><h3>${esc(tpl.name)}</h3><p class="muted">${esc(tpl.focus)} · ${tpl.items.length} egzersiz · ${tpl.items.reduce((n, i) => n + (+i.sets || 0), 0)} set</p></div>${typeBadge(tpl.type)}</div>
-    <div class="tpl-list">
+    <div class="card-head"><span class="card-title">Bu Hafta · ${esc(active.name)}</span><span class="muted sm">${DateUtil.format(plan[0].date, { year: false })} – ${DateUtil.format(plan[6].date)}</span></div>
+    <div class="day-grid">${plan.map(dayCard).join('')}</div>
+    <div class="card-head mt"><span class="card-title">Gelecek Hafta</span></div>
+    <div class="day-grid compact">${nextPlan.map(dayCard).join('')}</div>
+    ${active.id === 'ul3' ? `<div class="note">${icon('info')}<span>3 günlük programda Pazartesi–Çarşamba–Cuma günleri <b>Üst → Alt → Üst</b> ile başlanır, sonraki hafta <b>Alt → Üst → Alt</b> olarak dönüşümlü devam eder. A/B varyasyonları sırayla uygulanır.</span></div>`
+      : active.id === 'ul4' ? `<div class="note">${icon('info')}<span>4 günlük programda Pazartesi (Üst A), Salı (Alt A), Perşembe (Üst B) ve Cuma (Alt B) uygulanır.</span></div>`
+      : `<div class="note">${icon('info')}<span>Kendi programındaki günleri ve antrenmanları "Düzenle" ile istediğin zaman değiştirebilirsin.</span></div>`}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">${icon('dumbbell')} Antrenmanlar</span><span class="muted sm">Egzersiz, set ve tekrarları düzenleyebilirsin</span></div>
+    <div class="tabs">${keys.map(k => `<button class="tab${k === key ? ' active' : ''}" data-action="tpl-tab" data-tpl="${k}">${s.templates[k].custom ? icon('star') : ''}${esc(s.templates[k].name)}</button>`).join('')}
+      <button class="tab tab-new" data-action="tpl-new">${icon('plus')} Yeni Antrenman</button></div>
+    <div class="tpl-head"><div><h3>${esc(tpl.name)}</h3><p class="muted">${esc(tpl.focus)} · ${tpl.items.length} egzersiz · ${tpl.items.reduce((n, i) => n + (+i.sets || 0), 0)} set</p></div>
+      <div class="tpl-head-actions">${typeBadge(tpl.type)}
+        <button class="btn-icon sm" data-action="tpl-edit" aria-label="Adı ve türü düzenle">${icon('edit')}</button>
+        ${tpl.custom ? `<button class="btn-icon sm" data-action="tpl-delete" aria-label="Antrenmanı sil">${icon('trash')}</button>` : ''}</div></div>
+    ${tpl.items.length ? `<div class="tpl-list">
       <div class="tpl-row tpl-row-head"><span></span><span>Egzersiz</span><span>Set</span><span>Tekrar</span><span></span></div>
       ${tpl.items.map((it, i) => {
         const ex = EX_BY_ID[it.ex];
+        if (!ex) return '';
         return `<div class="tpl-row">
           ${thumb(ex, 'sm')}
-          <a href="#/exercise/${ex.id}" class="tpl-name"><b>${esc(ex.name)}</b><small>${ex.group}</small></a>
+          <a href="#/exercise/${encodeURIComponent(ex.id)}" class="tpl-name"><b>${esc(ex.name)}</b><small>${ex.group}</small></a>
           <input type="number" min="1" max="10" value="${it.sets}" data-change="tpl-field" data-i="${i}" data-f="sets" aria-label="Set sayısı">
           <input type="text" maxlength="8" value="${esc(it.reps)}" data-change="tpl-field" data-i="${i}" data-f="reps" aria-label="Tekrar">
           <div class="tpl-btns">
@@ -544,13 +588,45 @@ function pagePrograms() {
           </div>
         </div>`;
       }).join('')}
-    </div>
+    </div>` : emptyState('dumbbell', 'Bu antrenman boş', '873 egzersizlik kütüphaneden istediğin hareketleri ekle.', `<button class="btn btn-primary" data-action="ex-picker" data-target="tpl">${icon('plus')} Egzersiz Ekle</button>`)}
     <div class="row-actions">
       <button class="btn btn-ghost" data-action="ex-picker" data-target="tpl">${icon('plus')} Egzersiz Ekle</button>
-      <button class="btn btn-ghost" data-action="tpl-reset">${icon('refresh')} Varsayılana Sıfırla</button>
-      <button class="btn btn-primary" data-action="start-workout" data-tpl="${key}">${icon('play')} Bu Antrenmanı Başlat</button>
+      ${tpl.custom ? '' : `<button class="btn btn-ghost" data-action="tpl-reset">${icon('refresh')} Varsayılana Sıfırla</button>`}
+      <button class="btn btn-primary" data-action="start-workout" data-tpl="${key}" ${tpl.items.length ? '' : 'disabled'}>${icon('play')} Bu Antrenmanı Başlat</button>
     </div>
   </div>`;
+}
+
+function openProgramModal(id) {
+  const s = S();
+  const p = id ? s.programs.find(x => x.id === id) : null;
+  const sched = p ? p.schedule : [null, null, null, null, null, null, null];
+  const opts = (sel) => `<option value="">Dinlenme</option>
+    ${Store.templateKeys().map(k => `<option value="${k}"${sel === k ? ' selected' : ''}>${esc(s.templates[k].name)}${s.templates[k].items.length ? '' : ' (boş)'}</option>`).join('')}
+    <option value="__new__">+ Yeni boş antrenman</option>`;
+  openModal(p ? 'Programı Düzenle' : 'Kendi Programını Oluştur', `
+    <form data-form="program" class="form">
+      <input type="hidden" name="id" value="${p ? p.id : ''}">
+      <div class="field"><label>Program adı</label><input name="name" required maxlength="40" value="${esc(p ? p.name : '')}" placeholder="Örn. Push / Pull / Legs"></div>
+      <p class="hint">Her gün için bir antrenman seç ya da dinlenme bırak. "Yeni boş antrenman" seçersen kaydettikten sonra içine egzersiz ekleyebilirsin.</p>
+      <div class="sched-list">${DAY_NAMES.map((d, i) => `<div class="sched-row"><span>${d}</span><select name="d${i}" aria-label="${d}">${opts(sched[i])}</select></div>`).join('')}</div>
+      <label class="check-row"><input type="checkbox" name="activate" ${!p || s.settings.program === p.id ? 'checked' : ''}><span>Aktif programım yap</span></label>
+      <div class="modal-actions"><button type="button" class="btn btn-ghost" data-action="modal-close">Vazgeç</button><button class="btn btn-primary" type="submit">${icon('check')} Kaydet</button></div>
+    </form>`);
+}
+
+function openTemplateModal(key) {
+  const t = key ? S().templates[key] : null;
+  openModal(t ? 'Antrenmanı Düzenle' : 'Yeni Antrenman', `
+    <form data-form="template" class="form">
+      <input type="hidden" name="key" value="${key || ''}">
+      <div class="field"><label>Antrenman adı</label><input name="name" required maxlength="40" value="${esc(t ? t.name : '')}" placeholder="Örn. Push Günü"></div>
+      <div class="form-row">
+        <div class="field grow"><label>Tür</label><select name="type">${Object.entries(TPL_TYPES).map(([k, v]) => `<option value="${k}"${(t ? t.type : 'full') === k ? ' selected' : ''}>${v.label}</option>`).join('')}</select></div>
+        <div class="field grow"><label>Odak (isteğe bağlı)</label><input name="focus" maxlength="40" value="${esc(t ? t.focus : '')}" placeholder="Örn. Göğüs · Omuz · Triceps"></div>
+      </div>
+      <div class="modal-actions"><button type="button" class="btn btn-ghost" data-action="modal-close">Vazgeç</button><button class="btn btn-primary" type="submit">${icon('check')} ${t ? 'Kaydet' : 'Oluştur'}</button></div>
+    </form>`);
 }
 
 /* 4) Egzersiz Detayı */
@@ -565,12 +641,12 @@ function pageExercise(id) {
   <button class="back-link" data-action="back">${icon('left')} Geri</button>
   <div class="card ex-hero t-${ex.region}">
     <div class="ex-media" data-action="ex-frame" title="Pozisyonu değiştirmek için dokun">
-      <img class="f0" src="${ex.img[0]}" alt="${esc(ex.name)} başlangıç pozisyonu">
-      <img class="f1" src="${ex.img[1]}" alt="${esc(ex.name)} bitiş pozisyonu">
+      <img class="f0" src="${ex.img[0]}" alt="${esc(ex.name)} başlangıç pozisyonu" onerror="this.onerror=null;this.src='${ex.thumb}'">
+      <img class="f1" src="${ex.img[1]}" alt="${esc(ex.name)} bitiş pozisyonu" onerror="this.onerror=null;this.src='${ex.thumb}'">
       <div class="ex-media-shade"></div>
       <div class="ex-frames"><span class="fr fr0">Başlangıç</span><span class="fr fr1">Bitiş</span></div>
       <div class="ex-hero-title">
-        <div class="badges"><span class="badge badge-red">${ex.group}</span><span class="badge">${ex.region === 'upper' ? 'Üst Vücut' : 'Alt Vücut'}</span></div>
+        <div class="badges"><span class="badge badge-red">${ex.group}</span>${ex.region === 'other' ? '' : `<span class="badge">${ex.region === 'upper' ? 'Üst Vücut' : 'Alt Vücut'}</span>`}</div>
         <h1>${esc(ex.name)}</h1>
       </div>
     </div>
@@ -589,13 +665,14 @@ function pageExercise(id) {
     <div class="card">
       <div class="card-head"><span class="card-title">Çalışan Kas Grupları</span></div>
       ${Charts.bodyMap(ex.muscles)}
-      <div class="chips static">${ex.muscles.map((m, i) => `<span class="chip${i === 0 ? ' active' : ''}">${MUSCLE_NAMES[m]}</span>`).join('')}</div>
+      <div class="chips static">${ex.muscles.length ? '' : '<span class="muted sm">Belirli bir kas grubu yok</span>'}${ex.muscles.map((m, i) => `<span class="chip${i === 0 ? ' active' : ''}">${MUSCLE_NAMES[m]}</span>`).join('')}</div>
     </div>
     <div class="card">
-      <div class="card-head"><span class="card-title">Nasıl Yapılır?</span></div>
-      <ol class="steps">${ex.steps.map(st => `<li>${esc(st)}</li>`).join('')}</ol>
-      <div class="card-head mt"><span class="card-title">İpuçları</span></div>
-      <ul class="tips">${ex.tips.map(tp => `<li>${icon('check')}<span>${esc(tp)}</span></li>`).join('')}</ul>
+      <div class="card-head"><span class="card-title">Nasıl Yapılır?</span>${ex.en ? '<span class="badge badge-gray" title="Bu egzersizin talimatları kaynak veritabanında İngilizcedir">EN</span>' : ''}</div>
+      ${ex.steps.length ? `<ol class="steps"${ex.en ? ' lang="en"' : ''}>${ex.steps.map(st => `<li>${esc(st)}</li>`).join('')}</ol>` : '<p class="muted">Bu egzersiz için adım bilgisi yok.</p>'}
+      ${ex.tips.length ? `<div class="card-head mt"><span class="card-title">İpuçları</span></div>
+      <ul class="tips">${ex.tips.map(tp => `<li>${icon('check')}<span>${esc(tp)}</span></li>`).join('')}</ul>` : ''}
+      <div class="kv-grid mt"><div><small>Ekipman</small><b class="sm">${esc(ex.equipment)}</b></div><div><small>Seviye</small><b class="sm">${ex.level}</b></div>${ex.cat ? `<div><small>Kategori</small><b class="sm">${ex.cat[0].toLocaleUpperCase('tr-TR') + ex.cat.slice(1)}</b></div>` : ''}<div><small>Kas grubu</small><b class="sm">${ex.group}</b></div></div>
     </div>
   </div>
   <div class="grid g-2">
@@ -962,20 +1039,23 @@ function pageStats() {
 
 /* 10) Egzersiz Kütüphanesi */
 function libraryList() {
-  const q = ui.libQuery.trim().toLocaleLowerCase('tr-TR');
-  const list = EXERCISES.filter(e => (ui.libGroup === 'Tümü' || e.group === ui.libGroup) &&
-    (!q || e.name.toLocaleLowerCase('tr-TR').includes(q) || e.group.toLocaleLowerCase('tr-TR').includes(q) || e.muscles.some(m => MUSCLE_NAMES[m].toLocaleLowerCase('tr-TR').includes(q))));
-  return `<div class="muted sm lib-count">${list.length} egzersiz</div>` + (list.length ? `<div class="lib-grid">${list.map(e => `
+  const list = filterExercises({ q: ui.libQuery, group: ui.libGroup, equip: ui.libEquip });
+  const shown = list.slice(0, ui.libLimit);
+  return `<div class="muted sm lib-count">${list.length} egzersiz${list.length > shown.length ? ` · ${shown.length} gösteriliyor` : ''}</div>` + (list.length ? `<div class="lib-grid">${shown.map(e => `
     <a href="#/exercise/${e.id}" class="list-item lib-item">${thumb(e)}
-      <div class="li-body"><span class="li-title">${esc(e.name)}</span><span class="li-sub">${e.group} · ${e.level} · ${e.sets}×${esc(e.reps)}</span></div>
-      <span class="badge ${e.region === 'upper' ? 'badge-red' : 'badge-blue'}">${e.region === 'upper' ? 'Üst' : 'Alt'}</span>${icon('right', 'li-end')}</a>`).join('')}</div>`
-    : emptyState('search', 'Sonuç bulunamadı', 'Farklı bir arama veya kas grubu dene.'));
+      <div class="li-body"><span class="li-title">${esc(e.name)}</span><span class="li-sub">${e.group} · ${esc(e.equipment)} · ${e.level}</span></div>
+      ${regionBadge(e)}${icon('right', 'li-end')}</a>`).join('')}</div>
+      ${list.length > shown.length ? `<button class="btn btn-ghost btn-block mt" data-action="lib-more">Daha fazla göster (${list.length - shown.length} kaldı)</button>` : ''}`
+    : emptyState('search', 'Sonuç bulunamadı', 'Farklı bir arama, kas grubu veya ekipman dene.'));
 }
 function pageLibrary() {
   return `
-  ${pageHead('Egzersiz Kütüphanesi', `${EXERCISES.length} egzersiz · açıklamalar, kas haritası ve teknik ipuçları`)}
+  ${pageHead('Egzersiz Kütüphanesi', `${EXERCISES.length} egzersiz · fotoğraflar, kas haritası ve uygulama adımları`)}
   <div class="card">
-    <div class="search">${icon('search')}<input type="search" placeholder="Egzersiz veya kas ara..." value="${esc(ui.libQuery)}" data-input="lib-search" aria-label="Egzersiz ara"></div>
+    <div class="lib-tools">
+      <div class="search">${icon('search')}<input type="search" placeholder="Egzersiz, kas veya ekipman ara... (örn. bench, dumbbell, biceps)" value="${esc(ui.libQuery)}" data-input="lib-search" aria-label="Egzersiz ara"></div>
+      <select data-change="lib-equip" aria-label="Ekipman filtresi"><option value="">Tüm ekipmanlar</option>${EQUIPMENTS.map(q => `<option${q === ui.libEquip ? ' selected' : ''}>${esc(q)}</option>`).join('')}</select>
+    </div>
     <div class="chips">${['Tümü', ...MUSCLE_GROUPS].map(g => `<button class="chip${g === ui.libGroup ? ' active' : ''}" data-action="lib-group" data-g="${g}">${g}</button>`).join('')}</div>
     <div id="libList">${libraryList()}</div>
   </div>`;
@@ -1065,8 +1145,9 @@ function pageSettings() {
     <div class="col">
       <div class="card">
         <div class="card-head"><span class="card-title">${icon('calendar')} Antrenman</span></div>
-        <div class="set-item"><span class="si-ic">${icon('dumbbell')}</span><div class="si-body"><b>Haftalık antrenman günü</b><small>Üst / alt vücut bölünmüş program</small></div>
-          <div class="seg sm"><button class="seg-btn${st.days === 3 ? ' active' : ''}" data-action="days-set" data-days="3">3 gün</button><button class="seg-btn${st.days === 4 ? ' active' : ''}" data-action="days-set" data-days="4">4 gün</button></div></div>
+        <div class="set-item"><span class="si-ic">${icon('dumbbell')}</span><div class="si-body"><b>Aktif program</b><small>Haftalık plan bu programa göre oluşur</small></div>
+          <select data-change="program-select" aria-label="Aktif program">${Store.programs().map(p => `<option value="${p.id}"${p.id === st.program ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
+        ${link('go-programs', 'calendar', 'Kendi programını oluştur', 'Günleri ve antrenmanları sen belirle')}
         <div class="set-item"><span class="si-ic">${icon('timer')}</span><div class="si-body"><b>Varsayılan dinlenme</b><small>Serbest dinlenme sayacı süresi</small></div>
           <select data-change="setting-num" data-key="restDefault" aria-label="Varsayılan dinlenme">${[45, 60, 90, 120, 150, 180, 240].map(v => `<option value="${v}"${st.restDefault === v ? ' selected' : ''}>${v} sn</option>`).join('')}</select></div>
         ${toggle('autoRest', 'refresh', 'Otomatik dinlenme sayacı', 'Set tamamlandığında sayacı başlat')}
@@ -1106,7 +1187,7 @@ function pageSettings() {
       </div>
       <div class="card">
         <div class="card-head"><span class="card-title">${icon('info')} Hakkında</span></div>
-        ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v1.1.0')}
+        ${link('about', 'info', 'Uygulama hakkında', 'FITTRACK v1.2.0')}
         ${link('privacy', 'shield', 'Gizlilik', 'Verilerin yalnızca bu cihazda saklanır')}
       </div>
       <div class="card brand-card">
@@ -1127,13 +1208,22 @@ const ROUTES = {
 /* =========================================================
    MODAL: egzersiz seçici, onboarding, yedekleme
    ========================================================= */
+function pickerList() {
+  const list = filterExercises({ q: ui.pickQuery, group: ui.pickGroup });
+  const shown = list.slice(0, 60);
+  return list.length ? shown.map(e => `<button class="list-item" data-action="pick-ex" data-id="${e.id}" data-target="${ui.pickTarget}">
+      ${thumb(e, 'sm')}<div class="li-body"><span class="li-title">${esc(e.name)}</span><span class="li-sub">${e.group} · ${esc(e.equipment)}</span></div>${icon('plus', 'li-end')}</button>`).join('')
+    + (list.length > shown.length ? `<p class="hint center">${list.length - shown.length} sonuç daha var — aramayı daralt.</p>` : '')
+    : emptyState('search', 'Sonuç yok', 'Farklı bir kelime dene.');
+}
 function openExercisePicker(target) {
-  const region = target === 'tpl' ? S().templates[ui.progTpl].type : null;
-  const sorted = [...EXERCISES].sort((a, b) => (a.region === region ? -1 : 0) - (b.region === region ? -1 : 0));
+  ui.pickTarget = target || '';
+  ui.pickQuery = '';
+  ui.pickGroup = 'Tümü';
   openModal('Egzersiz Ekle', `
-    <div class="search">${icon('search')}<input type="search" placeholder="Ara..." data-input="picker-search" aria-label="Egzersiz ara"></div>
-    <div class="picker-list">${sorted.map(e => `<button class="list-item" data-action="pick-ex" data-id="${e.id}" data-target="${target || ''}" data-name="${esc(e.name.toLocaleLowerCase('tr-TR'))} ${e.group.toLocaleLowerCase('tr-TR')}">
-      ${thumb(e, 'sm')}<div class="li-body"><span class="li-title">${esc(e.name)}</span><span class="li-sub">${e.group} · ${e.region === 'upper' ? 'Üst vücut' : 'Alt vücut'}</span></div>${icon('plus', 'li-end')}</button>`).join('')}</div>`, { wide: true });
+    <div class="search">${icon('search')}<input type="search" placeholder="${EXERCISES.length} egzersiz içinde ara..." data-input="picker-search" aria-label="Egzersiz ara"></div>
+    <div class="chips picker-chips">${['Tümü', ...MUSCLE_GROUPS].map(g => `<button class="chip${g === 'Tümü' ? ' active' : ''}" data-action="pick-group" data-g="${g}">${g}</button>`).join('')}</div>
+    <div class="picker-list" id="pickerList">${pickerList()}</div>`, { wide: true });
 }
 
 function openOnboarding() {
@@ -1238,7 +1328,8 @@ const ACTIONS = {
     const id = el.dataset.id, ex = EX_BY_ID[id];
     if (el.dataset.target === 'tpl') {
       S().templates[ui.progTpl].items.push({ ex: id, sets: ex.sets, reps: ex.reps });
-      Store.save(); closeModal(); rerender(); toast(`${ex.name} şablona eklendi`);
+      Store.save(); rerender(); toast(`${esc(ex.name)} eklendi — eklemeye devam edebilirsin`);
+      el.classList.add('picked'); el.disabled = true;
     } else {
       Store.addExerciseToActive(id); closeModal(); toast(`${ex.name} eklendi`);
       if (currentPage === 'workout') rerender(); else go('workout');
@@ -1281,11 +1372,33 @@ const ACTIONS = {
   'rest-stop': () => Rest.stop(),
 
   /* Program */
-  'days-set': (el) => {
-    const d = +el.dataset.days;
-    if (S().settings.days === d) return;
-    S().settings.days = d; Store.save(); rerender();
-    toast(`Program haftada ${d} gün olarak ayarlandı`);
+  'days-set': (el) => ACTIONS['program-set']({ dataset: { id: +el.dataset.days === 4 ? 'ul4' : 'ul3' } }),
+  'program-set': (el) => {
+    const p = Store.programs().find(x => x.id === el.dataset.id);
+    if (!p || S().settings.program === p.id) return;
+    Store.setProgram(p.id); rerender();
+    toast(`Aktif program: ${esc(p.name)}`);
+  },
+  'program-edit': (el) => openProgramModal(el.dataset.id || null),
+  'program-delete': (el) => {
+    const p = S().programs.find(x => x.id === el.dataset.id);
+    if (!p) return;
+    confirmBox('Programı sil', `<b>${esc(p.name)}</b> silinsin mi? İçindeki antrenmanlar silinmez.`, 'Sil', () => { Store.deleteProgram(p.id); rerender(); toast('Program silindi', 'info'); });
+  },
+  'tpl-new': () => openTemplateModal(null),
+  'tpl-edit': () => openTemplateModal(ui.progTpl),
+  'tpl-delete': () => {
+    const t = S().templates[ui.progTpl];
+    if (!t || !t.custom) return;
+    confirmBox('Antrenmanı sil', `<b>${esc(t.name)}</b> silinsin mi? Programlardaki ilgili günler dinlenme olarak kalır.`, 'Sil', () => {
+      Store.deleteTemplate(ui.progTpl); ui.progTpl = 'upperA'; rerender(); toast('Antrenman silindi', 'info');
+    });
+  },
+  'lib-more': () => { ui.libLimit += 60; $('#libList').innerHTML = libraryList(); },
+  'pick-group': (el) => {
+    ui.pickGroup = el.dataset.g;
+    document.querySelectorAll('.picker-chips .chip').forEach(c => c.classList.toggle('active', c === el));
+    $('#pickerList').innerHTML = pickerList(); $('#pickerList').scrollTop = 0;
   },
   'tpl-tab': (el) => { ui.progTpl = el.dataset.tpl; rerender(); },
   'tpl-remove': (el) => {
@@ -1337,7 +1450,7 @@ const ACTIONS = {
   'weight-del': (el) => { Store.removeWeight(el.dataset.date); rerender(); },
 
   /* Kütüphane */
-  'lib-group': (el) => { ui.libGroup = el.dataset.g; rerender(); },
+  'lib-group': (el) => { ui.libGroup = el.dataset.g; ui.libLimit = 40; rerender(); },
 
   /* Profil */
   'profile-edit': openProfileModal,
@@ -1351,6 +1464,7 @@ const ACTIONS = {
   /* Ayarlar */
   'theme': (el) => { S().settings.theme = el.dataset.v; Store.save(); applyTheme(); rerender(); },
   'export': exportData,
+  'go-programs': () => go('programs'),
   'copy-backup': () => {
     const ta = $('#backupText');
     const done = () => toast('Yedek panoya kopyalandı');
@@ -1375,7 +1489,7 @@ const ACTIONS = {
   }),
   'about': () => openModal('FITTRACK Hakkında', `
     <div class="about"><div class="brand big">${icon('dumbbell')}<span class="brand-text">FIT<span>TRACK</span></span></div>
-    <p class="muted">Sürüm 1.1.0 · Daha güçlü bir sen.</p>
+    <p class="muted">Sürüm 1.2.0 · Daha güçlü bir sen.</p>
     <p>FITTRACK; üst/alt vücut bölünmüş antrenman programı, set–tekrar–ağırlık takibi, dinlenme sayacı, beslenme, protein, kalori ve su takibini tek bir yerde toplayan, tamamen çevrimdışı çalışan bir fitness uygulamasıdır.</p>
     <p class="hint">Egzersiz fotoğrafları: Free Exercise DB (kamu malı, Unlicense). HTML5, CSS3 ve saf JavaScript ile geliştirilmiştir. Kalori ve vücut yağı hesaplamaları tahminidir; tıbbi tavsiye yerine geçmez.</p></div>`),
   'privacy': () => openModal('Gizlilik', `
@@ -1416,6 +1530,32 @@ const FORMS = {
     if (v.weight && v.weight !== Store.currentWeight()) Store.addWeight(DateUtil.today(), v.weight);
     Store.save(); rerender();
   },
+  program(d) {
+    const created = [];
+    const schedule = DAY_NAMES.map((day, i) => {
+      const v = d['d' + i];
+      if (v === '__new__') {
+        const k = Store.createTemplate(`${(d.name || 'Program').trim()} · ${day}`, 'full', 'Özel antrenman');
+        created.push(k);
+        return k;
+      }
+      return v || null;
+    });
+    if (!schedule.some(Boolean)) { toast('En az bir güne antrenman ata', 'err'); return; }
+    const p = Store.saveProgram({ id: d.id, name: d.name, schedule });
+    if (d.activate) Store.setProgram(p.id);
+    closeModal();
+    if (created.length) ui.progTpl = created[0];
+    rerender();
+    toast(created.length ? `${esc(p.name)} kaydedildi. Şimdi yeni antrenmanlara egzersiz ekle 💪` : `${esc(p.name)} kaydedildi`);
+    if (created.length) setTimeout(() => { const el = $('.tpl-head'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
+  },
+  template(d) {
+    if (d.key) { Store.updateTemplate(d.key, d); toast('Antrenman güncellendi'); }
+    else { ui.progTpl = Store.createTemplate(d.name, d.type, d.focus); toast(`${esc(d.name)} oluşturuldu — şimdi egzersiz ekle`); }
+    closeModal();
+    if (currentPage === 'programs') rerender(); else go('programs');
+  },
   profile(d) {
     const p = S().profile;
     p.name = d.name.trim();
@@ -1434,7 +1574,7 @@ const FORMS = {
     p.age = d.age ? +d.age : null;
     p.height = d.height ? +d.height : null;
     p.goals = [d.goal];
-    s.settings.days = +d.days === 4 ? 4 : 3;
+    Store.setProgram(+d.days === 4 ? 'ul4' : 'ul3');
     s.settings.programStart = DateUtil.weekStart();
     if (d.weight) {
       Store.addWeight(DateUtil.today(), d.weight);
@@ -1481,6 +1621,10 @@ document.addEventListener('change', (e) => {
   if (kind === 'setting-bool') {
     S().settings[el.dataset.key] = el.checked; Store.save();
     if (el.dataset.key === 'reminders' && el.checked) toast('Su hatırlatıcı açıldı', 'info');
+  } else if (kind === 'program-select') {
+    ACTIONS['program-set']({ dataset: { id: el.value } });
+  } else if (kind === 'lib-equip') {
+    ui.libEquip = el.value; ui.libLimit = 40; $('#libList').innerHTML = libraryList();
   } else if (kind === 'setting-num') {
     S().settings[el.dataset.key] = +el.value; Store.save(); toast('Ayar kaydedildi');
   } else if (kind === 'tpl-field') {
@@ -1516,11 +1660,11 @@ document.addEventListener('input', (e) => {
     st[el.dataset.f] = el.value === '' ? '' : +el.value;
     clearTimeout(saveTimer); saveTimer = setTimeout(() => Store.save(), 300);
   } else if (el.dataset.input === 'lib-search') {
-    ui.libQuery = el.value;
-    $('#libList').innerHTML = libraryList();
+    ui.libQuery = el.value; ui.libLimit = 40;
+    clearTimeout(saveTimer); saveTimer = setTimeout(() => { $('#libList').innerHTML = libraryList(); }, 120);
   } else if (el.dataset.input === 'picker-search') {
-    const q = el.value.trim().toLocaleLowerCase('tr-TR');
-    document.querySelectorAll('.picker-list [data-name]').forEach(b => { b.hidden = q && !b.dataset.name.includes(q); });
+    ui.pickQuery = el.value;
+    clearTimeout(saveTimer); saveTimer = setTimeout(() => { const pl = $('#pickerList'); if (pl) { pl.innerHTML = pickerList(); pl.scrollTop = 0; } }, 120);
   }
 });
 

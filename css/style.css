@@ -515,6 +515,51 @@ body.resting .finish-bar, body.resting .sticky-actions { bottom: 104px; }
 .sticky-actions { margin-top: 0; }
 .sticky-actions .btn { box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
 
+/* ---------------- Programlar ---------------- */
+.prog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.prog-card { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 14px; background: rgba(255, 255, 255, .02); border: 1px solid var(--line); text-align: left; transition: .2s; }
+.prog-card.active { border-color: rgba(255, 45, 61, .55); background: linear-gradient(180deg, rgba(255, 45, 61, .09), rgba(255, 45, 61, .02)); box-shadow: 0 0 24px -12px var(--red-glow); }
+.pc-top { display: flex; align-items: center; gap: 12px; }
+.pc-top b { font-size: .95rem; }
+.pc-top small { color: var(--muted); font-size: .78rem; }
+.pc-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--card-3); color: var(--red-2); flex-shrink: 0; }
+.pc-dots { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.pc-dots span { height: 26px; border-radius: 7px; display: grid; place-items: center; font-size: .62rem; font-weight: 700; color: var(--muted); background: var(--card-3); }
+.pc-dots .t-upper, .pc-dots .t-push { background: rgba(255, 45, 61, .2); color: #ffb3b9; }
+.pc-dots .t-lower, .pc-dots .t-legs { background: rgba(59, 130, 246, .22); color: #bfdbfe; }
+.pc-dots .t-full, .pc-dots .t-pull, .pc-dots .t-cardio { background: rgba(139, 92, 246, .22); color: #ddd6fe; }
+.pc-actions { display: flex; gap: 8px; align-items: center; margin-top: auto; }
+.pc-actions .btn-icon { margin-left: auto; }
+.prog-new { align-items: center; justify-content: center; text-align: center; gap: 4px; border-style: dashed; border-color: var(--line-2); min-height: 150px; color: var(--muted); }
+.prog-new .ic { width: 30px; height: 30px; color: var(--red); }
+.prog-new b { color: var(--text); }
+.prog-new:hover { border-color: var(--red); background: rgba(255, 45, 61, .05); }
+.tab .ic { width: 13px; height: 13px; margin-right: 4px; vertical-align: -2px; color: var(--orange); }
+.tab-new { border-style: dashed; color: var(--red-2); }
+.tab-new .ic { color: var(--red-2); }
+.tpl-head-actions { display: flex; align-items: center; gap: 6px; }
+.sched-list { display: flex; flex-direction: column; gap: 6px; }
+.sched-row { display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 10px; }
+.sched-row span { font-weight: 600; font-size: .9rem; }
+.sched-row select { width: 100%; height: 42px; padding: 0 12px; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 11px; outline: none; }
+.check-row { display: flex; align-items: center; gap: 10px; font-size: .9rem; cursor: pointer; }
+.check-row input { width: 18px; height: 18px; accent-color: var(--red); }
+.day-card.t-full, .day-card.t-pull, .day-card.t-cardio { background: linear-gradient(180deg, rgba(139, 92, 246, .12), rgba(139, 92, 246, .02)); border-color: rgba(139, 92, 246, .28); }
+.day-card.t-push { background: linear-gradient(180deg, rgba(255, 45, 61, .1), rgba(255, 45, 61, .02)); border-color: rgba(255, 45, 61, .25); }
+.day-card.t-legs { background: linear-gradient(180deg, rgba(59, 130, 246, .11), rgba(59, 130, 246, .02)); border-color: rgba(59, 130, 246, .25); }
+.ws.t-full b, .ws.t-pull b, .ws.t-cardio b { color: #c4b5fd; }
+.ws.t-push b { color: var(--red-2); }
+.ws.t-legs b { color: #93c5fd; }
+.lib-tools { display: flex; gap: 10px; flex-wrap: wrap; }
+.lib-tools .search { flex: 1 1 280px; }
+.lib-tools select { height: 48px !important; min-width: 180px; border-radius: 13px !important; }
+.list-item.picked { border-color: rgba(34, 197, 94, .5); background: rgba(34, 197, 94, .07); opacity: 1; }
+.list-item.picked .li-end { color: var(--green); }
+.picker-chips { flex-wrap: nowrap; overflow-x: auto; margin: 4px 0; padding-bottom: 4px; scrollbar-width: none; }
+.picker-chips .chip { white-space: nowrap; }
+.hint.center { text-align: center; }
+.thumb.t-other { border-color: rgba(139, 92, 246, .35); }
+
 /* ---------------- Egzersiz detayı ---------------- */
 .back-link { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 600; font-size: .9rem; align-self: flex-start; }
 .back-link:hover { color: var(--text); }
@@ -875,6 +920,9 @@ input[type=date]::-webkit-calendar-picker-indicator { filter: invert(.7); }
   .meals, .lib-grid { grid-template-columns: minmax(0, 1fr); }
   .lib-item .thumb.photo { width: 72px; height: 54px; }
   .lib-item .badge { display: none; }
+  .prog-grid { grid-template-columns: 1fr; }
+  .sched-row { grid-template-columns: 84px 1fr; }
+  .lib-tools select { flex: 1; }
   .kv-grid.five { grid-template-columns: repeat(2, 1fr); }
   .kv-grid.five > div:last-child { grid-column: 1 / -1; }
   .day-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }

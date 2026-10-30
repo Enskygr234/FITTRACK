@@ -4,6 +4,7 @@ compressionType: false
 doNotCompress:
 - resources.arsc
 - png
+- jpg
 isFrameworkApk: false
 packageInfo:
   forcedPackageId: '127'
@@ -19,5 +20,5 @@ usesFramework:
   tag: null
 version: 2.10.0
 versionInfo:
-  versionCode: '2'
-  versionName: 1.1.0
+  versionCode: '3'
+  versionName: 1.2.0
