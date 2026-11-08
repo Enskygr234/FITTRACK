@@ -1,8 +1,8 @@
 /* FITTRACK — basit çevrimdışı önbellek (yalnızca http/https üzerinde çalışır) */
-const CACHE = 'fittrack-v3';
+const CACHE = 'fittrack-v4';
 const ASSETS = [
   './', './index.html', './css/style.css',
-  './js/exercises-db.js', './js/tr-content.js', './js/data.js', './js/store.js', './js/charts.js', './js/script.js', './js/extras.js',
+  './js/exercises-db.js', './js/tr-content.js', './js/data.js', './js/store.js', './js/charts.js', './js/script.js', './js/extras.js', './js/ai.js', './js/home-workout.js',
   './assets/icon.svg', './manifest.webmanifest'
 ];
 

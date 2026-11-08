@@ -27,6 +27,9 @@
 - **Temalar**: koyu, tam siyah (AMOLED) ve açık tema
 - **Türkçe içerik**: popüler 74 egzersizin Türkçe adı ve uygulama adımları
 - **Android ana ekran widget'ı**: bugünkü antrenman, su, protein ve kalori özeti; uygulamayı açmadan +250 ml su ekleme
+- **Yapay Zeka Koç (Gemini)**: antrenman geçmişini, öğünlerini ve hedeflerini bilen sohbet koçu; hazır soru kısayolları
+- **Fotoğraftan kalori (Gemini)**: yemeğin fotoğrafını çek, kalori/protein/karbonhidrat/yağ tahmini gelsin, düzeltip kaydet
+- **Evde Antrenman (Ekipmansız Mod)**: evdeki eşyaları seç (sandalye, çanta, havlu, su şişesi…), hedef/süre/seviyeye göre devre oluşturulsun; sesli ve zamanlayıcılı tam ekran oynatıcı; listede olmayan eşyalar için yapay zeka hareket önerisi
 - **LocalStorage**: tüm veriler cihazda saklanır; sunucu, hesap veya takip yok
 - **Duyarlı tasarım**: telefon (alt menü + çekmece), tablet (ikon menü), masaüstü (tam kenar çubuğu)
 
@@ -42,6 +45,8 @@ fittrack/
 │   ├── exercises-db.js     # 845 ek egzersiz (tools/build-exercise-db.py ile üretilir)
 │   ├── tr-content.js       # Türkçe egzersiz adımları ve besin listesi
 │   ├── extras.js           # Araçlar, vücut takibi, başarılar, barkod, bildirimler
+│   ├── ai.js               # Gemini istemcisi, Yapay Zeka Koç, fotoğraftan kalori
+│   ├── home-workout.js     # Evde Antrenman (Ekipmansız Mod) ve oynatıcı
 │   ├── vendor/             # html5-qrcode (Apache-2.0) — barkod tarayıcı
 │   ├── data.js             # İkonlar, egzersizler, program şablonları, besinler
 │   ├── store.js            # LocalStorage veri katmanı, takvim/rotasyon mantığı
@@ -63,6 +68,10 @@ fittrack/
     └── build-apk.sh
 ```
 
+## Yapay zeka (Gemini)
+
+Yapay zeka özellikleri isteğe bağlıdır. **Ayarlar → Yapay Zeka (Gemini)** bölümüne [Google AI Studio](https://aistudio.google.com/apikey)'dan alınan API anahtarı girilir. Varsayılan model `gemini-3.5-flash-lite`'tır (bulunamazsa `gemini-flash-lite-latest` kullanılır). Anahtar yalnızca cihazda (`localStorage`) tutulur ve JSON yedeklerine eklenmez. Yapay zeka yalnızca kullanıcı bir özelliği kullandığında çağrılır.
+
 ## Çalıştırma
 
 Derleme gerekmez. `index.html` dosyasını tarayıcıda açman yeterli. PWA/servis çalışanı için yerel bir sunucu kullan:
@@ -83,7 +92,7 @@ mkdir -p tools
 curl -L -o tools/apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar
 curl -L -o tools/uber-apk-signer.jar https://github.com/patrickfav/uber-apk-signer/releases/download/v1.3.0/uber-apk-signer-1.3.0.jar
 ./build-apk.sh
-# Çıktı: android/dist/FITTRACK-v2.0.0.apk
+# Çıktı: android/dist/FITTRACK-v2.1.0.apk
 ```
 
 Varsayılan olarak hata ayıklama anahtarıyla imzalanır. Kendi anahtarınla imzalamak için:
