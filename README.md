@@ -92,7 +92,7 @@ mkdir -p tools
 curl -L -o tools/apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar
 curl -L -o tools/uber-apk-signer.jar https://github.com/patrickfav/uber-apk-signer/releases/download/v1.3.0/uber-apk-signer-1.3.0.jar
 ./build-apk.sh
-# Çıktı: android/dist/FITTRACK-v2.1.0.apk
+# Çıktı: android/dist/FITTRACK-v2.1.1.apk
 ```
 
 Varsayılan olarak hata ayıklama anahtarıyla imzalanır. Kendi anahtarınla imzalamak için:

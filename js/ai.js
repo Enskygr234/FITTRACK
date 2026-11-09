@@ -44,8 +44,9 @@ const AI = {
     for (const m of models) {
       let r;
       try {
-        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(key)}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        // Anahtar başlıkta gönderilir (yeni "AQ." ve eski "AIza" anahtarların ikisiyle de çalışır)
+        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body)
         });
       } catch (e) { throw new Error('İnternet bağlantısı yok ya da Gemini\'ye ulaşılamadı.'); }
       const j = await r.json().catch(() => ({}));
@@ -60,8 +61,9 @@ const AI = {
   },
   errText(status, j) {
     const msg = (j && j.error && j.error.message) || '';
-    if (status === 400 && /API key|API_KEY/i.test(msg)) return 'API anahtarı geçersiz. Ayarlar → Yapay Zeka bölümünden kontrol et.';
-    if (status === 403) return 'Bu API anahtarının Gemini\'ye erişim izni yok.';
+    const detail = msg ? ` (${esc(msg.slice(0, 160))})` : '';
+    if ((status === 400 && /API key|API_KEY/i.test(msg)) || status === 401) return `Google bu API anahtarını kabul etmedi. Anahtarı AI Studio'dan baştan sona kopyalayıp yeniden yapıştır.${detail}`;
+    if (status === 403) return `Bu API anahtarının Gemini API'ye erişim izni yok. AI Studio'da yeni bir anahtar oluşturmayı dene.${detail}`;
     if (status === 429) return 'Gemini kotası doldu. Biraz bekleyip tekrar dene.';
     if (status >= 500) return 'Gemini şu an yanıt vermiyor, biraz sonra tekrar dene.';
     return `Gemini hatası (${status})${msg ? ': ' + esc(msg.slice(0, 140)) : ''}`;
@@ -101,7 +103,7 @@ function aiSettingsCard() {
     <div class="card-head"><span class="card-title">${icon('sparkle')} Yapay Zeka (Gemini)</span>${has ? '<span class="badge badge-green">Bağlı</span>' : '<span class="badge badge-gray">Kapalı</span>'}</div>
     <p class="muted sm">Koç, fotoğraftan kalori ve ev antrenmanında özel hareketler için Google Gemini kullanılır. Anahtar yalnızca bu cihazda saklanır ve yedeklere eklenmez.</p>
     <form data-form="ai-key" class="form inline-form mt" autocomplete="off">
-      <div class="field grow"><label>Gemini API anahtarı</label><input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="${has ? '••••••••' + esc(k.slice(-4)) : 'AIza…'}" aria-label="Gemini API anahtarı"></div>
+      <div class="field grow"><label>Gemini API anahtarı</label><input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="${has ? '••••••••' + esc(k.slice(-4)) : 'AQ.Ab… ya da AIza…'}" aria-label="Gemini API anahtarı"></div>
       <button class="btn btn-primary" type="submit">${icon('key')} Kaydet</button>
     </form>
     <div class="field mt"><label>Model</label><select data-change="ai-model" aria-label="Gemini modeli">${AI.MODELS.map(([id, label]) => `<option value="${id}"${id === AI.model() ? ' selected' : ''}>${label}</option>`).join('')}</select></div>
@@ -111,11 +113,21 @@ function aiSettingsCard() {
     </div>
   </div>`;
 }
-FORMS['ai-key'] = (d, form) => {
-  const k = String(d.key || '').trim();
+/* Yapıştırılan metni temizle: boşluk, satır sonu, tırnak, "key=" öneki, tam URL */
+function cleanKey(raw) {
+  let k = String(raw || '').replace(/[\s\u200B-\u200D\uFEFF"'`]/g, '');
+  const m = k.match(/[?&]key=([^&]+)/); if (m) k = decodeURIComponent(m[1]);
+  return k.replace(/^(GEMINI_API_KEY|API_KEY|key)[:=]/i, '');
+}
+FORMS['ai-key'] = async (d, form) => {
+  const k = cleanKey(d.key);
   if (!k) { toast('Anahtarı yapıştır', 'err'); return; }
-  if (!/^[A-Za-z0-9_\-]{20,}$/.test(k)) { toast('Bu bir Gemini API anahtarına benzemiyor', 'err'); return; }
-  AI.set(AI.KEY, k); form.reset(); rerender(); toast('API anahtarı kaydedildi ✓');
+  // Hem eski (AIza…) hem yeni (AQ.Ab…) Google anahtar biçimleri kabul edilir
+  if (k.length < 20 || !/^[A-Za-z0-9._\-]+$/.test(k)) { toast('Bu bir Gemini API anahtarına benzemiyor. AI Studio\'dan kopyaladığın anahtarın tamamını yapıştır.', 'err'); return; }
+  AI.set(AI.KEY, k); form.reset(); rerender();
+  toast('Anahtar kaydedildi, test ediliyor…', 'info');
+  try { await AI.ask({ contents: [{ role: 'user', parts: [{ text: 'Sadece "Tamam" yaz.' }] }], maxTokens: 20 }); toast('Gemini bağlandı ✓'); }
+  catch (e) { toast(e.message, 'err'); }
 };
 EXTRA_CHANGES['ai-model'] = (el) => { AI.set(AI.MODEL_KEY, el.value); toast('Model değiştirildi'); };
 
@@ -124,7 +136,7 @@ function aiHelpModal() {
     <ol class="steps">
       <li><span><b>aistudio.google.com/apikey</b> adresini aç ve Google hesabınla giriş yap.</span></li>
       <li><span><b>Create API key</b> (API anahtarı oluştur) düğmesine bas.</span></li>
-      <li><span>Çıkan anahtarı (AIza… ile başlar) kopyala.</span></li>
+      <li><span>Çıkan anahtarı kopyala. Yeni anahtarlar <b>AQ.</b> ile başlar (eskiler AIza…); ikisi de çalışır.</span></li>
       <li><span>FITTRACK → Ayarlar → Yapay Zeka bölümüne yapıştırıp <b>Kaydet</b>'e bas.</span></li>
     </ol>
     <p class="hint">Gemini'nin ücretsiz kullanım kotası günlük kişisel kullanım için genelde yeterlidir. Anahtarını kimseyle paylaşma.</p>
